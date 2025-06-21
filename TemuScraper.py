@@ -187,15 +187,55 @@ async def extract(page) -> List[Dict]:
             if not title_text:
                 title_text = f"Product {pid}"
 
-            # Get price (if visible)
-            price = 0.0
-            price_el = await container.query_selector("[class*='price']")
-            if price_el:
-                price_text = await price_el.inner_text()
-                # Extract numeric price
-                price_match = re.search(r'[\d,]+\.?\d*', price_text)
-                if price_match:
-                    price = float(price_match.group().replace(',', ''))
+            # ── Price ────────────────────────────────────────────
+            price = 0.0  # default initial
+
+            # Candidate selectors ordered by reliability
+            candidate_selectors = [
+                "div[data-type='price'][aria-label]",  # primary: aria‑label carries "$"
+                "[data-price]",                        # explicit data-price attribute
+                "[class*='price']",                    # generic class name
+                "[class*='Price']",
+            ]
+
+            raw_price_text = ""
+            selected_el = None
+            for sel in candidate_selectors:
+                el = await container.query_selector(sel)
+                if not el:
+                    continue
+
+                selected_el = el  # remember for deeper fallback
+
+                # Priority: aria‑label → data‑price → innerText
+                raw_price_text = (
+                    await el.get_attribute("aria-label")
+                    or await el.get_attribute("data-price")
+                    or await el.inner_text()
+                    or ""
+                )
+
+                m_price = re.search(r"[\d]+(?:[\d,]*)(?:\.\d+)?", raw_price_text)
+                if m_price:
+                    price = float(m_price.group().replace(",", ""))
+                    break  # price found
+
+            # Deeper fallback: combine nested <span> texts inside the selected price element
+            if price == 0.0 and selected_el is not None:
+                spans = await selected_el.query_selector_all("span")
+                nested_text = ""
+                for sp in spans:
+                    nested_text += (await sp.inner_text() or "").strip()
+                m_price = re.search(r"([\d]+(?:[\d,]*)(?:\.\d+)?)", nested_text)
+                if m_price:
+                    price = float(m_price.group(1).replace(",", ""))
+
+            # Final fallback: regex over the entire container HTML
+            if price == 0.0:
+                html_snippet = await container.inner_html()
+                m_price = re.search(r"\$?\s*([\d]+(?:[\d,]*)(?:\.\d+)?)", html_snippet)
+                if m_price:
+                    price = float(m_price.group(1).replace(",", ""))
 
             products.append({
                 "temu_id": pid,
@@ -301,6 +341,6 @@ async def main():
         print("\n🚪 Close the browser window to end session.")
         await context.close()
 
- 
+
 if __name__ == "__main__":
     asyncio.run(main())
