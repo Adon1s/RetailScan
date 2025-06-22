@@ -71,7 +71,19 @@ def analyze_product_local(product: Dict, image_path: Path, model_name: Optional[
         chat.add_user_message(prompt, images=[image_handle])
 
         prediction = model.respond(chat)
-        return prediction
+
+        # Convert the PredictionResult to a plain string so the
+        # return type matches `Optional[str]`
+        if hasattr(prediction, "message") and hasattr(prediction.message, "content"):
+            result_text = prediction.message.content
+        elif hasattr(prediction, "choices") and prediction.choices:
+            # Newer SDKs may follow the OpenAI format
+            result_text = prediction.choices[0].message.content
+        else:
+            # Fallback: best‑effort string conversion
+            result_text = str(prediction)
+
+        return result_text
     except Exception as e:
         print(f"Local SDK error: {e}")
         return None
@@ -132,6 +144,10 @@ def analyze_single_product(product: Dict, model_name: Optional[str] = None) -> D
     if not analysis:
         print("Using remote LM Studio server...")
         analysis = analyze_product_remote(product, image_path, model_name)
+
+    # Ensure the analysis value is JSON‑serializable
+    if not isinstance(analysis, str):
+        analysis = str(analysis)
 
     return {
         'temu_id': temu_id,
