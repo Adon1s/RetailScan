@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temu Product Analysis Dashboard</title>
+<style>
+    * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+    body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f5f7fa;
+    color: #333;
+}
+
+    .dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+    /* Header Styles */
+    .header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+    .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+    .stat-card {
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+    .stat-value {
+    font-size: 32px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+    .stat-label {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+    /* Controls */
+    .controls {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: end;
+}
+
+    .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+    .control-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+    select, input, button {
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+    select:hover, input:hover, button:hover {
+    border-color: #667eea;
+}
+
+    button {
+    background: #667eea;
+    color: white;
+    border: none;
+    font-weight: 600;
+}
+
+    button:hover {
+    background: #5a67d8;
+    transform: translateY(-1px);
+}
+
+    /* Product Grid */
+    .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+    .product-card {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+    .product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+    .product-card.selected {
+    border: 2px solid #667eea;
+}
+
+    .product-image {
+    height: 200px;
+    background: #f0f0f0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 14px;
+}
+
+    .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+    .price-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+    .verdict-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 12px;
+    color: white;
+}
+
+    .verdict-research {
+    background: #10b981;
+}
+
+    .verdict-skip {
+    background: #ef4444;
+}
+
+    .product-content {
+    padding: 15px;
+}
+
+    .product-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.4;
+    height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+    .scores {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+    .score-item {
+    text-align: center;
+}
+
+    .score-label {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 3px;
+}
+
+    .score-value {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    color: white;
+}
+
+    .score-high { background: #10b981; }
+    .score-medium { background: #f59e0b; }
+    .score-low { background: #ef4444; }
+
+    .profit-section {
+    background: #f0fdf4;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+    .profit-value {
+    font-weight: bold;
+    color: #059669;
+}
+
+    .meta-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #666;
+}
+
+    /* Comparison Modal */
+    .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+    .modal-content {
+    background: white;
+    width: 90%;
+    max-width: 1200px;
+    height: 90%;
+    margin: 5% auto;
+    border-radius: 10px;
+    overflow: auto;
+    position: relative;
+}
+
+    .modal-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+    .modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+}
+
+    .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+    /* Loading */
+    .loading {
+    text-align: center;
+    padding: 50px;
+    color: #666;
+}
+
+    /* Responsive */
+    @media (max-width: 768px) {
+    .product-grid {
+    grid-template-columns: 1fr;
+}
+
+    .controls {
+    flex-direction: column;
+}
+
+    .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+}
+}
+</style>
+</head>
+<body>
+<div class="dashboard">
+    <!-- Header -->
+    <div class="header">
+        <h1>Temu Product Analysis Dashboard</h1>
+        <div class="stats-grid" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-products">0</div>
+                <div class="stat-label">Total Products</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="research-count">0</div>
+                <div class="stat-label">Research Further</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="skip-count">0</div>
+                <div class="stat-label">Skip</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-viability">0.0</div>
+                <div class="stat-label">Avg. Viability</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <div class="control-group">
+            <label>Sort By</label>
+            <select id="sort-select">
+                <option value="viability">Viability Score</option>
+                <option value="profit">Profit Potential</option>
+                <option value="demand">Market Demand</option>
+                <option value="quality">Quality Score</option>
+                <option value="roi">ROI %</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Filter Verdict</label>
+            <select id="filter-verdict">
+                <option value="all">All Products</option>
+                <option value="RESEARCH FURTHER">Research Further</option>
+                <option value="SKIP">Skip</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Min Viability</label>
+            <select id="min-viability">
+                <option value="0">All</option>
+                <option value="6">6+ (Good)</option>
+                <option value="7">7+ (Very Good)</option>
+                <option value="8">8+ (Excellent)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Competition</label>
+            <select id="filter-competition">
+                <option value="all">All Levels</option>
+                <option value="Low">Low Only</option>
+                <option value="Medium">Medium Only</option>
+                <option value="High">High Only</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Search</label>
+            <input type="text" id="search-input" placeholder="Search products...">
+        </div>
+
+        <button id="compare-btn" style="margin-left: auto;">
+            Compare Selected (<span id="selected-count">0</span>)
+        </button>
+    </div>
+
+    <!-- Product Grid -->
+    <div id="product-grid" class="product-grid">
+        <div class="loading">Loading products...</div>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div id="comparison-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Product Comparison</h2>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="comparison-content" class="comparison-grid"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // State management
+    let products = [];
+    let selectedProducts = new Set();
+    let currentFilters = {
+    verdict: 'all',
+    minViability: 0,
+    competition: 'all',
+    search: ''
+};
+    let currentSort = 'viability';
+
+    // Initialize dashboard
+    async function init() {
+    // Load products from JSON file
+    try {
+    const response = await fetch('viability_screening_results.json');
+    const data = await response.json();
+    products = data.results || [];
+    updateStats();
+    renderProducts();
+} catch (error) {
+    console.error('Error loading products:', error);
+    // Use sample data for demo
+    products = getSampleData();
+    updateStats();
+    renderProducts();
+}
+
+    // Setup event listeners
+    setupEventListeners();
+}
+
+    // Sample data for demo
+    function getSampleData() {
+    return [
+{
+    temu_id: "601099817564070",
+    title: "Interactive Baby Elephant - Christmas Gift Interactive Baby Elephant Belly Time Toys",
+    price: 16.13,
+    analysis: {
+    viability_score: 8,
+    product_quality_score: 7,
+    market_demand_score: 9,
+    verdict: "RESEARCH FURTHER",
+    competition_level: "Medium",
+    safety_compliance_risks: { risk_level: "Low" },
+    estimated_amazon_price_range: { low: 34.99, high: 49.99 },
+    primary_concerns: ["Competition", "Seasonality"]
+}
+},
+{
+    temu_id: "601100041101610",
+    title: "54 In 1 Busy Board Montessori Toys For Toddler 1-3",
+    price: 15.64,
+    analysis: {
+    viability_score: 6,
+    product_quality_score: 5,
+    market_demand_score: 8,
+    verdict: "RESEARCH FURTHER",
+    competition_level: "High",
+    safety_compliance_risks: { risk_level: "Medium" },
+    estimated_amazon_price_range: { low: 24.99, high: 39.99 },
+    primary_concerns: ["Safety Compliance", "Competition"]
+}
+},
+{
+    temu_id: "601100123456",
+    title: "LED Light Up Drawing Board for Kids Ages 3-12",
+    price: 12.99,
+    analysis: {
+    viability_score: 4,
+    product_quality_score: 4,
+    market_demand_score: 5,
+    verdict: "SKIP",
+    competition_level: "High",
+    safety_compliance_risks: { risk_level: "Low" },
+    estimated_amazon_price_range: { low: 19.99, high: 24.99 },
+    primary_concerns: ["Low margins", "Saturated market"]
+}
+}
+    ];
+}
+
+    // Setup event listeners
+    function setupEventListeners() {
+    document.getElementById('sort-select').addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        renderProducts();
+    });
+
+    document.getElementById('filter-verdict').addEventListener('change', (e) => {
+    currentFilters.verdict = e.target.value;
+    renderProducts();
+});
+
+    document.getElementById('min-viability').addEventListener('change', (e) => {
+    currentFilters.minViability = parseInt(e.target.value);
+    renderProducts();
+});
+
+    document.getElementById('filter-competition').addEventListener('change', (e) => {
+    currentFilters.competition = e.target.value;
+    renderProducts();
+});
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+    currentFilters.search = e.target.value.toLowerCase();
+    renderProducts();
+});
+
+    document.getElementById('compare-btn').addEventListener('click', showComparison);
+}
+
+    // Update statistics
+    function updateStats() {
+    const research = products.filter(p => p.analysis.verdict === 'RESEARCH FURTHER').length;
+    const skip = products.filter(p => p.analysis.verdict === 'SKIP').length;
+    const avgViability = products.reduce((sum, p) => sum + p.analysis.viability_score, 0) / products.length || 0;
+
+    document.getElementById('total-products').textContent = products.length;
+    document.getElementById('research-count').textContent = research;
+    document.getElementById('skip-count').textContent = skip;
+    document.getElementById('avg-viability').textContent = avgViability.toFixed(1);
+}
+
+    // Filter and sort products
+    function getFilteredProducts() {
+    let filtered = [...products];
+
+    // Apply filters
+    if (currentFilters.verdict !== 'all') {
+    filtered = filtered.filter(p => p.analysis.verdict === currentFilters.verdict);
+}
+
+    if (currentFilters.minViability > 0) {
+    filtered = filtered.filter(p => p.analysis.viability_score >= currentFilters.minViability);
+}
+
+    if (currentFilters.competition !== 'all') {
+    filtered = filtered.filter(p => p.analysis.competition_level === currentFilters.competition);
+}
+
+    if (currentFilters.search) {
+    filtered = filtered.filter(p =>
+    p.title.toLowerCase().includes(currentFilters.search) ||
+    p.temu_id.includes(currentFilters.search)
+    );
+}
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+    switch (currentSort) {
+    case 'viability':
+    return b.analysis.viability_score - a.analysis.viability_score;
+    case 'profit':
+    const profitA = a.analysis.estimated_amazon_price_range.high - a.price;
+    const profitB = b.analysis.estimated_amazon_price_range.high - b.price;
+    return profitB - profitA;
+    case 'demand':
+    return b.analysis.market_demand_score - a.analysis.market_demand_score;
+    case 'quality':
+    return b.analysis.product_quality_score - a.analysis.product_quality_score;
+    case 'roi':
+    const roiA = ((a.analysis.estimated_amazon_price_range.high - a.price) / a.price) * 100;
+    const roiB = ((b.analysis.estimated_amazon_price_range.high - b.price) / b.price) * 100;
+    return roiB - roiA;
+    default:
+    return 0;
+}
+});
+
+    return filtered;
+}
+
+    // Get score color class
+    function getScoreClass(score) {
+    if (score >= 8) return 'score-high';
+    if (score >= 6) return 'score-medium';
+    return 'score-low';
+}
+
+    // Render products
+    function renderProducts() {
+    const grid = document.getElementById('product-grid');
+    const filtered = getFilteredProducts();
+
+    if (filtered.length === 0) {
+    grid.innerHTML = '<div class="loading">No products match your filters</div>';
+    return;
+}
+
+    grid.innerHTML = filtered.map(product => {
+    const profit = product.analysis.estimated_amazon_price_range.high - product.price;
+    const roi = (profit / product.price * 100).toFixed(0);
+    const isSelected = selectedProducts.has(product.temu_id);
+
+    return `
+                    <div class="product-card ${isSelected ? 'selected' : ''}"
+                         onclick="toggleSelection('${product.temu_id}')"
+                         data-id="${product.temu_id}">
+                        <div class="product-image">
+                            <div class="price-badge">$${product.price.toFixed(2)}</div>
+                            <div class="verdict-badge ${product.analysis.verdict === 'RESEARCH FURTHER' ? 'verdict-research' : 'verdict-skip'}">
+                                ${product.analysis.verdict === 'RESEARCH FURTHER' ? '✅ Research' : '❌ Skip'}
+                            </div>
+                            <img src="./temu_baby_toys_imgs/${product.temu_id}.jpg" alt="${product.title}" />
+                        </div>
+                        <div class="product-content">
+                            <div class="product-title">${product.title}</div>
+
+                            <div class="scores">
+                                <div class="score-item">
+                                    <div class="score-label">Viability</div>
+                                    <span class="score-value ${getScoreClass(product.analysis.viability_score)}">
+                                        ${product.analysis.viability_score}/10
+                                    </span>
+                                </div>
+                                <div class="score-item">
+                                    <div class="score-label">Quality</div>
+                                    <span class="score-value ${getScoreClass(product.analysis.product_quality_score)}">
+                                        ${product.analysis.product_quality_score}/10
+                                    </span>
+                                </div>
+                                <div class="score-item">
+                                    <div class="score-label">Demand</div>
+                                    <span class="score-value ${getScoreClass(product.analysis.market_demand_score)}">
+                                        ${product.analysis.market_demand_score}/10
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="profit-section">
+                                <div>Est: $${product.analysis.estimated_amazon_price_range.low.toFixed(2)} - $${product.analysis.estimated_amazon_price_range.high.toFixed(2)}</div>
+                                <div class="profit-value">Profit: $${profit.toFixed(2)} (${roi}% ROI)</div>
+                            </div>
+
+                            <div class="meta-info">
+                                <span>Competition: ${product.analysis.competition_level}</span>
+                                <span>Risk: ${product.analysis.safety_compliance_risks.risk_level}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+}).join('');
+}
+
+    // Toggle product selection
+    function toggleSelection(productId) {
+    if (selectedProducts.has(productId)) {
+    selectedProducts.delete(productId);
+} else {
+    selectedProducts.add(productId);
+}
+
+    // Update UI
+    document.getElementById('selected-count').textContent = selectedProducts.size;
+    const card = document.querySelector(`[data-id="${productId}"]`);
+    card.classList.toggle('selected');
+}
+
+    // Show comparison modal
+    function showComparison() {
+    if (selectedProducts.size === 0) {
+    alert('Please select products to compare');
+    return;
+}
+
+    const modal = document.getElementById('comparison-modal');
+    const content = document.getElementById('comparison-content');
+
+    // Get selected products
+    const compareProducts = products.filter(p => selectedProducts.has(p.temu_id));
+
+    // Generate comparison content
+    content.innerHTML = compareProducts.map(product => {
+    const profit = product.analysis.estimated_amazon_price_range.high - product.price;
+    const roi = (profit / product.price * 100).toFixed(0);
+
+    return `
+                    <div class="product-card">
+                        <div class="product-image">
+                            <div class="price-badge">$${product.price.toFixed(2)}</div>
+                            <img src="./temu_baby_toys_imgs/${product.temu_id}.jpg" alt="${product.title}" />
+                        </div>
+                        <div class="product-content">
+                            <h3 style="font-size: 16px; margin-bottom: 15px;">${product.title}</h3>
+
+                            <table style="width: 100%; font-size: 14px;">
+                                <tr>
+                                    <td><strong>Viability:</strong></td>
+                                    <td>${product.analysis.viability_score}/10</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Quality:</strong></td>
+                                    <td>${product.analysis.product_quality_score}/10</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Demand:</strong></td>
+                                    <td>${product.analysis.market_demand_score}/10</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Competition:</strong></td>
+                                    <td>${product.analysis.competition_level}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Est. Price:</strong></td>
+                                    <td>$${product.analysis.estimated_amazon_price_range.low}-$${product.analysis.estimated_amazon_price_range.high}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Profit:</strong></td>
+                                    <td>$${profit.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>ROI:</strong></td>
+                                    <td>${roi}%</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Verdict:</strong></td>
+                                    <td>${product.analysis.verdict}</td>
+                                </tr>
+                            </table>
+
+                            <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                <strong>Concerns:</strong><br>
+                                ${product.analysis.primary_concerns.join(', ')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+}).join('');
+
+    modal.style.display = 'block';
+}
+
+    // Close modal
+    function closeModal() {
+    document.getElementById('comparison-modal').style.display = 'none';
+}
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+    const modal = document.getElementById('comparison-modal');
+    if (event.target === modal) {
+    modal.style.display = 'none';
+}
+}
+
+    // Initialize on load
+    init();
+</script>
+</body>
+</html>

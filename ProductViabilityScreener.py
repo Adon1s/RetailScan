@@ -1,8 +1,9 @@
 """
-Temu Product Viability Screener
+Temu Product Viability Screener - Structured Output Version
 Initial screening to determine if products are worth deeper Amazon research
 
 Features:
+- Structured JSON output from LLM for easy querying
 - Incremental saving: Each result is saved immediately after analysis
 - Resume support: Skips already-analyzed products if script is restarted
 - No duplicates: Checks existing results before analyzing
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import time
 import warnings
-warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL')
+warnings.filterwarnings('ignore',  message='urllib3 v2 only supports OpenSSL')
 
 
 # Configuration
@@ -25,7 +26,7 @@ IMAGES_DIR = Path("temu_baby_toys_imgs")
 ANALYSIS_OUTPUT = Path("viability_screening_results.json")
 
 def create_analysis_prompt(product: Dict) -> str:
-    """Create a prompt for initial viability screening"""
+    """Create a prompt for initial viability screening with structured output"""
     prompt = f"""Analyze this Temu product for initial resale viability:
 
 PRODUCT DETAILS:
@@ -40,24 +41,86 @@ KEYWORD INDICATORS:
 - Is Bundle/Set: {product.get('is_bundle_or_set', False)}
 - Has Gift Potential: {product.get('has_gift_potential', False)}
 
-Based on the product image and details, provide:
+Based on the product image and details, provide your analysis in the following JSON format. Be sure to output ONLY valid JSON with no additional text:
 
-1. PRODUCT QUALITY (1-10): Visual assessment of build quality and materials
-2. MARKET DEMAND (1-10): How desirable is this type of product?
-3. TARGET AUDIENCE: Primary buyers (be specific: age of kids, type of parents)
-4. COMPETITION LEVEL: Is this a saturated product type? (Low/Medium/High)
-5. SHIPPING FEASIBILITY: Size/weight concerns for online selling?
-6. SAFETY/COMPLIANCE RISKS: Any potential safety or regulatory concerns?
-7. BRAND POTENTIAL: Generic or could build brand around it?
-8. VIABILITY SCORE (1-10): Worth researching further on Amazon?
-9. PRIMARY CONCERNS: Main risks or red flags
-10. VERDICT: RESEARCH FURTHER or SKIP (with brief reasoning)
+{{
+  "product_quality_score": <number 1-10>,
+  "product_quality_notes": "<brief notes on build quality and materials>",
+  
+  "market_demand_score": <number 1-10>,
+  "market_demand_notes": "<brief notes on desirability>",
+  
+  "target_audience": {{
+    "primary_buyers": "<e.g., Parents of toddlers 1-3>",
+    "child_age_range": "<e.g., 6-36 months>",
+    "buyer_profile": "<e.g., Quality-conscious parents, Gift buyers>"
+  }},
+  
+  "competition_level": "<Low/Medium/High>",
+  "competition_notes": "<brief notes on market saturation>",
+  
+  "shipping_feasibility": {{
+    "rating": "<Easy/Moderate/Difficult>",
+    "concerns": "<e.g., Size, weight, fragility issues>"
+  }},
+  
+  "safety_compliance_risks": {{
+    "risk_level": "<Low/Medium/High>",
+    "specific_concerns": "<e.g., Small parts, certifications needed>"
+  }},
+  
+  "brand_potential": {{
+    "rating": "<Generic/Moderate/High>",
+    "notes": "<Can this build a brand?>"
+  }},
+  
+  "viability_score": <number 1-10>,
+  "primary_concerns": ["<concern 1>", "<concern 2>", "<concern 3>"],
+  
+  "verdict": "<RESEARCH FURTHER or SKIP>",
+  "verdict_reasoning": "<1-2 sentence explanation>",
+  
+  "estimated_amazon_price_range": {{
+    "low": <number>,
+    "high": <number>
+  }},
+  
+  "key_selling_points": ["<point 1>", "<point 2>", "<point 3>"],
+  
+  "recommended_keywords": ["<keyword 1>", "<keyword 2>", "<keyword 3>"]
+}}
 
-Focus on whether this product is worth deeper market research, NOT on specific pricing."""
+Focus on whether this product is worth deeper market research. Output ONLY the JSON, no other text."""
 
     return prompt
 
-def analyze_product_local(product: Dict, image_path: Path, model_name: Optional[str] = None) -> Optional[str]:
+def parse_llm_response(response: str) -> Dict:
+    """Parse the LLM response and extract JSON"""
+    try:
+        # Try to parse the entire response as JSON
+        return json.loads(response)
+    except json.JSONDecodeError:
+        # If that fails, try to extract JSON from the response
+        # Look for opening and closing braces
+        start = response.find('{')
+        end = response.rfind('}')
+
+        if start != -1 and end != -1:
+            json_str = response[start:end+1]
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+
+        # If all parsing fails, return a fallback structure
+        return {
+            "error": "Failed to parse LLM response",
+            "raw_response": response,
+            "verdict": "SKIP",
+            "verdict_reasoning": "Unable to parse analysis"
+        }
+
+def analyze_product_local(product: Dict, image_path: Path, model_name: Optional[str] = None) -> Optional[Dict]:
     """Screen a product using local LM Studio SDK"""
     try:
         import lmstudio as lms
@@ -71,12 +134,12 @@ def analyze_product_local(product: Dict, image_path: Path, model_name: Optional[
         chat.add_user_message(prompt, images=[image_handle])
 
         prediction = model.respond(chat)
-        return prediction
+        return parse_llm_response(prediction)
     except Exception as e:
         print(f"Local SDK error: {e}")
         return None
 
-def analyze_product_remote(product: Dict, image_path: Path, model_name: Optional[str] = None) -> str:
+def analyze_product_remote(product: Dict, image_path: Path, model_name: Optional[str] = None) -> Dict:
     """Screen a product using remote LM Studio API"""
     # Read and encode image
     with open(image_path, 'rb') as img_file:
@@ -107,10 +170,11 @@ def analyze_product_remote(product: Dict, image_path: Path, model_name: Optional
     )
 
     result = response.json()
-    return result['choices'][0]['message']['content']
+    raw_content = result['choices'][0]['message']['content']
+    return parse_llm_response(raw_content)
 
 def analyze_single_product(product: Dict, model_name: Optional[str] = None) -> Dict:
-    """Screen a single product and return results"""
+    """Screen a single product and return structured results"""
     temu_id = product['temu_id']
     image_path = IMAGES_DIR / f"{temu_id}.jpg"
 
@@ -123,8 +187,13 @@ def analyze_single_product(product: Dict, model_name: Optional[str] = None) -> D
         return {
             'temu_id': temu_id,
             'title': product['title'],
-            'analysis': 'SKIPPED - No image available',
-            'error': 'Image not found'
+            'price': product['price'],
+            'analysis': {
+                'error': 'Image not found',
+                'verdict': 'SKIP',
+                'verdict_reasoning': 'No image available for analysis'
+            },
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
         }
 
     # Try local first, then remote
@@ -133,10 +202,13 @@ def analyze_single_product(product: Dict, model_name: Optional[str] = None) -> D
         print("Using remote LM Studio server...")
         analysis = analyze_product_remote(product, image_path, model_name)
 
+    # Add product metadata to the result
     return {
         'temu_id': temu_id,
         'title': product['title'],
         'price': product['price'],
+        'price_category': product.get('price_category'),
+        'high_value_keywords': product.get('high_value_keywords', []),
         'analysis': analysis,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
     }
@@ -165,11 +237,23 @@ def append_result_to_file(result: Dict, existing_results: Dict[str, Dict]):
     # Add to existing results
     existing_results[result['temu_id']] = result
 
-    # Prepare output data
+    # Prepare output data with summary statistics
+    all_results = list(existing_results.values())
+
+    # Calculate summary stats
+    research_count = sum(1 for r in all_results if r.get('analysis', {}).get('verdict') == 'RESEARCH FURTHER')
+    skip_count = sum(1 for r in all_results if r.get('analysis', {}).get('verdict') == 'SKIP')
+    avg_viability = sum(r.get('analysis', {}).get('viability_score', 0) for r in all_results) / len(all_results) if all_results else 0
+
     output_data = {
         'screening_date': time.strftime('%Y-%m-%d %H:%M:%S'),
         'total_screened': len(existing_results),
-        'results': list(existing_results.values())
+        'summary': {
+            'research_further_count': research_count,
+            'skip_count': skip_count,
+            'average_viability_score': round(avg_viability, 2)
+        },
+        'results': all_results
     }
 
     # Save to file (overwrites with updated data)
@@ -177,6 +261,33 @@ def append_result_to_file(result: Dict, existing_results: Dict[str, Dict]):
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
     print(f"✓ Saved result for {result['temu_id']}")
+
+def print_analysis_summary(result: Dict):
+    """Print a formatted summary of the analysis"""
+    analysis = result.get('analysis', {})
+
+    print("\n📊 SCREENING RESULT:")
+    print("-" * 60)
+
+    if 'error' in analysis:
+        print(f"❌ Error: {analysis.get('error')}")
+        print(f"Raw response: {analysis.get('raw_response', 'N/A')[:200]}...")
+    else:
+        print(f"✓ Viability Score: {analysis.get('viability_score', 'N/A')}/10")
+        print(f"✓ Quality Score: {analysis.get('product_quality_score', 'N/A')}/10")
+        print(f"✓ Market Demand: {analysis.get('market_demand_score', 'N/A')}/10")
+        print(f"✓ Competition: {analysis.get('competition_level', 'N/A')}")
+        print(f"✓ Target: {analysis.get('target_audience', {}).get('primary_buyers', 'N/A')}")
+
+        print(f"\n📍 Verdict: {analysis.get('verdict', 'N/A')}")
+        print(f"   Reason: {analysis.get('verdict_reasoning', 'N/A')}")
+
+        if analysis.get('estimated_amazon_price_range'):
+            price_range = analysis['estimated_amazon_price_range']
+            print(f"\n💰 Est. Amazon Price: ${price_range.get('low', 0):.2f} - ${price_range.get('high', 0):.2f}")
+
+        if analysis.get('primary_concerns'):
+            print(f"\n⚠️  Concerns: {', '.join(analysis['primary_concerns'])}")
 
 def analyze_products(
     limit: int = 10,
@@ -194,7 +305,7 @@ def analyze_products(
     :param category: Price category filter (low_margin, medium_margin, good_margin, high_ticket)
     :param model_name: Specific LM Studio model to use
     """
-    print("\n=== Temu Product Viability Screener ===\n")
+    print("\n=== Temu Product Viability Screener (Structured Output) ===\n")
 
     # Load existing results to avoid duplicates
     existing_results = load_existing_results()
@@ -255,10 +366,8 @@ def analyze_products(
         try:
             result = analyze_single_product(product, model_name)
 
-            # Print analysis
-            print("\n📊 SCREENING RESULT:")
-            print("-" * 60)
-            print(result['analysis'])
+            # Print analysis summary
+            print_analysis_summary(result)
 
             # Save immediately
             append_result_to_file(result, existing_results)
@@ -297,7 +406,9 @@ def analyze_specific_product(temu_id: str, model_name: Optional[str] = None):
         print(f"⚠️  Product {temu_id} has already been analyzed!")
         print("\nExisting analysis:")
         print("-" * 60)
-        print(existing_results[temu_id]['analysis'])
+        # Print the structured analysis nicely
+        result = existing_results[temu_id]
+        print_analysis_summary(result)
         return
 
     # Load products
@@ -318,10 +429,8 @@ def analyze_specific_product(temu_id: str, model_name: Optional[str] = None):
     try:
         result = analyze_single_product(product, model_name)
 
-        # Print analysis
-        print("\n📊 SCREENING RESULT:")
-        print("-" * 60)
-        print(result['analysis'])
+        # Print analysis summary
+        print_analysis_summary(result)
 
         # Save immediately
         append_result_to_file(result, existing_results)
@@ -330,7 +439,7 @@ def analyze_specific_product(temu_id: str, model_name: Optional[str] = None):
         print(f"❌ Error analyzing product: {e}")
 
 def show_analysis_stats():
-    """Show statistics about analyzed products"""
+    """Show statistics about analyzed products with structured data"""
     existing_results = load_existing_results()
 
     if not existing_results:
@@ -340,22 +449,57 @@ def show_analysis_stats():
     print(f"\n=== Analysis Statistics ===")
     print(f"Total products analyzed: {len(existing_results)}")
 
-    # Count verdicts
-    research_further = 0
-    skip = 0
+    # Aggregate statistics from structured data
+    viability_scores = []
+    quality_scores = []
+    demand_scores = []
+    verdicts = {'RESEARCH FURTHER': 0, 'SKIP': 0, 'OTHER': 0}
+    competition_levels = {'Low': 0, 'Medium': 0, 'High': 0}
 
     for result in existing_results.values():
-        analysis_text = result.get('analysis', '').upper()
-        if 'RESEARCH FURTHER' in analysis_text:
-            research_further += 1
-        elif 'SKIP' in analysis_text:
-            skip += 1
+        analysis = result.get('analysis', {})
 
-    print(f"Products to research further: {research_further}")
-    print(f"Products to skip: {skip}")
-    print(f"Other/Unclear: {len(existing_results) - research_further - skip}")
+        # Collect scores
+        if 'viability_score' in analysis:
+            viability_scores.append(analysis['viability_score'])
+        if 'product_quality_score' in analysis:
+            quality_scores.append(analysis['product_quality_score'])
+        if 'market_demand_score' in analysis:
+            demand_scores.append(analysis['market_demand_score'])
 
-    print(f"\nResults file: {ANALYSIS_OUTPUT}")
+        # Count verdicts
+        verdict = analysis.get('verdict', 'OTHER')
+        if verdict in verdicts:
+            verdicts[verdict] += 1
+        else:
+            verdicts['OTHER'] += 1
+
+        # Count competition levels
+        comp_level = analysis.get('competition_level', 'Unknown')
+        if comp_level in competition_levels:
+            competition_levels[comp_level] += 1
+
+    # Calculate averages
+    avg_viability = sum(viability_scores) / len(viability_scores) if viability_scores else 0
+    avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
+    avg_demand = sum(demand_scores) / len(demand_scores) if demand_scores else 0
+
+    print(f"\n📊 Score Averages:")
+    print(f"  - Viability: {avg_viability:.1f}/10")
+    print(f"  - Quality: {avg_quality:.1f}/10")
+    print(f"  - Market Demand: {avg_demand:.1f}/10")
+
+    print(f"\n📍 Verdict Distribution:")
+    print(f"  - Research Further: {verdicts['RESEARCH FURTHER']}")
+    print(f"  - Skip: {verdicts['SKIP']}")
+    print(f"  - Other/Unclear: {verdicts['OTHER']}")
+
+    print(f"\n🏁 Competition Levels:")
+    for level, count in competition_levels.items():
+        if count > 0:
+            print(f"  - {level}: {count}")
+
+    print(f"\n📁 Results file: {ANALYSIS_OUTPUT}")
 
 def show_remaining_products(limit: int = 20):
     """Show products that haven't been analyzed yet"""
@@ -381,8 +525,8 @@ def show_remaining_products(limit: int = 20):
         print(f"   Keywords: {', '.join(product.get('high_value_keywords', [])) or 'None'}")
         print()
 
-def export_research_candidates(output_file: str = "research_candidates.json"):
-    """Export products marked 'RESEARCH FURTHER' to a separate file"""
+def export_research_candidates(output_file: str = "research_candidates.json", min_viability: float = 7.0):
+    """Export products marked 'RESEARCH FURTHER' to a separate file with all structured data"""
     existing_results = load_existing_results()
 
     if not existing_results:
@@ -392,14 +536,31 @@ def export_research_candidates(output_file: str = "research_candidates.json"):
     # Find products to research
     research_candidates = []
     for result in existing_results.values():
-        analysis_text = result.get('analysis', '').upper()
-        if 'RESEARCH FURTHER' in analysis_text:
+        analysis = result.get('analysis', {})
+        verdict = analysis.get('verdict', '')
+        viability_score = analysis.get('viability_score', 0)
+
+        if verdict == 'RESEARCH FURTHER' and viability_score >= min_viability:
+            # Include all structured data for further processing
             research_candidates.append({
                 'temu_id': result['temu_id'],
                 'title': result['title'],
-                'price': result['price'],
-                'analysis_summary': result['analysis'][:200] + '...'
+                'temu_price': result['price'],
+                'price_category': result.get('price_category'),
+                'viability_score': viability_score,
+                'quality_score': analysis.get('product_quality_score'),
+                'demand_score': analysis.get('market_demand_score'),
+                'estimated_amazon_price': analysis.get('estimated_amazon_price_range'),
+                'target_audience': analysis.get('target_audience'),
+                'competition_level': analysis.get('competition_level'),
+                'key_selling_points': analysis.get('key_selling_points', []),
+                'recommended_keywords': analysis.get('recommended_keywords', []),
+                'primary_concerns': analysis.get('primary_concerns', []),
+                'verdict_reasoning': analysis.get('verdict_reasoning')
             })
+
+    # Sort by viability score
+    research_candidates.sort(key=lambda x: x['viability_score'], reverse=True)
 
     # Save to file
     output_path = Path(output_file)
@@ -407,11 +568,73 @@ def export_research_candidates(output_file: str = "research_candidates.json"):
         json.dump({
             'export_date': time.strftime('%Y-%m-%d %H:%M:%S'),
             'total_candidates': len(research_candidates),
+            'min_viability_filter': min_viability,
             'candidates': research_candidates
         }, f, indent=2, ensure_ascii=False)
 
     print(f"\n✓ Exported {len(research_candidates)} research candidates to: {output_path}")
-    print("These products are ready for Amazon price research!")
+    print(f"  (Filtered by viability score >= {min_viability})")
+    print("\nThese products are ready for Amazon price research!")
+
+def query_products(field: str, operator: str = ">=", value: float = 0, limit: int = 10):
+    """
+    Query analyzed products by any numeric field
+
+    :param field: Field to query (e.g., 'viability_score', 'quality_score', 'demand_score')
+    :param operator: Comparison operator ('>', '>=', '<', '<=', '==')
+    :param value: Value to compare against
+    :param limit: Maximum results to show
+    """
+    existing_results = load_existing_results()
+
+    if not existing_results:
+        print("No products have been analyzed yet.")
+        return
+
+    # Map field names to their paths in the data structure
+    field_map = {
+        'viability_score': lambda r: r.get('analysis', {}).get('viability_score', 0),
+        'quality_score': lambda r: r.get('analysis', {}).get('product_quality_score', 0),
+        'demand_score': lambda r: r.get('analysis', {}).get('market_demand_score', 0),
+        'price': lambda r: r.get('price', 0),
+    }
+
+    if field not in field_map:
+        print(f"Unknown field: {field}")
+        print(f"Available fields: {', '.join(field_map.keys())}")
+        return
+
+    # Filter results
+    filtered = []
+    for result in existing_results.values():
+        field_value = field_map[field](result)
+
+        if operator == '>=' and field_value >= value:
+            filtered.append(result)
+        elif operator == '>' and field_value > value:
+            filtered.append(result)
+        elif operator == '<=' and field_value <= value:
+            filtered.append(result)
+        elif operator == '<' and field_value < value:
+            filtered.append(result)
+        elif operator == '==' and field_value == value:
+            filtered.append(result)
+
+    # Sort by the queried field
+    filtered.sort(key=lambda r: field_map[field](r), reverse=(operator in ['>=', '>']))
+
+    # Display results
+    print(f"\n=== Products where {field} {operator} {value} ===")
+    print(f"Found {len(filtered)} products\n")
+
+    for i, result in enumerate(filtered[:limit], 1):
+        analysis = result.get('analysis', {})
+        print(f"{i}. {result['title'][:60]}...")
+        print(f"   Temu ID: {result['temu_id']}")
+        print(f"   Price: ${result['price']:.2f}")
+        print(f"   {field}: {field_map[field](result)}")
+        print(f"   Verdict: {analysis.get('verdict', 'N/A')}")
+        print()
 
 def main():
     """Main entry point with Fire CLI"""
@@ -420,7 +643,8 @@ def main():
         'analyze_one': analyze_specific_product,
         'stats': show_analysis_stats,
         'remaining': show_remaining_products,
-        'export': export_research_candidates
+        'export': export_research_candidates,
+        'query': query_products
     })
 
 if __name__ == "__main__":
