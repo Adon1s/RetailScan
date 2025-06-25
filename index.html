@@ -3,26 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temu Product Analysis Dashboard</title>
+    <title>Amazon Product Analysis Dashboard</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: #f5f7fa;
             color: #333;
         }
-
         .dashboard {
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
-
         /* Header Styles */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -32,32 +29,27 @@
             margin-bottom: 30px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }
-
         .stat-card {
             background: rgba(255,255,255,0.1);
             padding: 15px;
             border-radius: 8px;
             backdrop-filter: blur(10px);
         }
-
         .stat-value {
             font-size: 32px;
             font-weight: bold;
             margin-bottom: 5px;
         }
-
         .stat-label {
             font-size: 14px;
             opacity: 0.9;
         }
-
         /* Controls */
         .controls {
             background: white;
@@ -70,19 +62,16 @@
             gap: 20px;
             align-items: end;
         }
-
         .control-group {
             display: flex;
             flex-direction: column;
             gap: 5px;
         }
-
         .control-group label {
             font-size: 12px;
             font-weight: 600;
             color: #666;
         }
-
         select, input, button {
             padding: 8px 15px;
             border: 1px solid #ddd;
@@ -92,23 +81,19 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
         select:hover, input:hover, button:hover {
             border-color: #667eea;
         }
-
         button {
             background: #667eea;
             color: white;
             border: none;
             font-weight: 600;
         }
-
         button:hover {
             background: #5a67d8;
             transform: translateY(-1px);
         }
-
         /* Product Grid */
         .product-grid {
             display: grid;
@@ -116,7 +101,6 @@
             gap: 20px;
             margin-bottom: 30px;
         }
-
         .product-card {
             background: white;
             border-radius: 10px;
@@ -124,23 +108,18 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             transition: all 0.3s;
         }
-
         .product-card:hover {
             box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         }
-
         .product-card.selected {
             border: 2px solid #667eea;
         }
-
         .product-clickable {
             cursor: pointer;
         }
-
         .product-clickable:hover {
             transform: translateY(-2px);
         }
-
         .product-image {
             height: 200px;
             background: #f0f0f0;
@@ -151,13 +130,11 @@
             color: #999;
             font-size: 14px;
         }
-
         .product-image img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-
         .price-badge {
             position: absolute;
             top: 10px;
@@ -169,7 +146,6 @@
             font-weight: bold;
             font-size: 14px;
         }
-
         .verdict-badge {
             position: absolute;
             top: 10px;
@@ -180,19 +156,15 @@
             font-size: 12px;
             color: white;
         }
-
         .verdict-research {
             background: #10b981;
         }
-
         .verdict-skip {
             background: #ef4444;
         }
-
         .product-content {
             padding: 15px;
         }
-
         .product-title {
             font-size: 14px;
             font-weight: 600;
@@ -205,24 +177,20 @@
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
         }
-
         .scores {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-bottom: 15px;
         }
-
         .score-item {
             text-align: center;
         }
-
         .score-label {
             font-size: 11px;
             color: #666;
             margin-bottom: 3px;
         }
-
         .score-value {
             display: inline-block;
             padding: 3px 8px;
@@ -231,11 +199,9 @@
             font-weight: bold;
             color: white;
         }
-
         .score-high { background: #10b981; }
         .score-medium { background: #f59e0b; }
         .score-low { background: #ef4444; }
-
         .profit-section {
             background: #f0fdf4;
             padding: 10px;
@@ -243,19 +209,30 @@
             margin-bottom: 10px;
             font-size: 13px;
         }
-
         .profit-value {
             font-weight: bold;
             color: #059669;
         }
-
         .meta-info {
             display: flex;
             justify-content: space-between;
             font-size: 12px;
             color: #666;
         }
-
+        /* New styles for reasoning tooltip */
+        .verdict-reasoning {
+            margin-top: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.4;
+            display: none;
+        }
+        .product-card:hover .verdict-reasoning {
+            display: block;
+        }
         /* Product Actions */
         .product-actions {
             background: #f8f9fa;
@@ -264,7 +241,6 @@
             display: flex;
             gap: 10px;
         }
-
         .product-actions button {
             font-size: 13px;
             transition: all 0.2s;
@@ -275,12 +251,10 @@
             cursor: pointer;
             color: white;
         }
-
         .product-actions button:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-
         /* Comparison Modal */
         .modal {
             display: none;
@@ -292,7 +266,6 @@
             background: rgba(0,0,0,0.5);
             z-index: 1000;
         }
-
         .modal-content {
             background: white;
             width: 90%;
@@ -303,7 +276,6 @@
             overflow: auto;
             position: relative;
         }
-
         .modal-header {
             background: #f8f9fa;
             padding: 20px;
@@ -312,7 +284,6 @@
             top: 0;
             z-index: 100;
         }
-
         .modal-close {
             position: absolute;
             top: 20px;
@@ -321,31 +292,26 @@
             cursor: pointer;
             color: #666;
         }
-
         .comparison-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             padding: 20px;
         }
-
         /* Loading */
         .loading {
             text-align: center;
             padding: 50px;
             color: #666;
         }
-
         /* Responsive */
         @media (max-width: 768px) {
             .product-grid {
                 grid-template-columns: 1fr;
             }
-
             .controls {
                 flex-direction: column;
             }
-
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -356,7 +322,7 @@
     <div class="dashboard">
         <!-- Header -->
         <div class="header">
-            <h1>Temu Product Analysis Dashboard</h1>
+            <h1>Amazon Product Analysis Dashboard</h1>
             <div class="stats-grid" id="stats">
                 <div class="stat-card">
                     <div class="stat-value" id="total-products">0</div>
@@ -387,9 +353,9 @@
                     <option value="demand">Market Demand</option>
                     <option value="quality">Quality Score</option>
                     <option value="roi">ROI %</option>
+                    <option value="total">Total Score</option>
                 </select>
             </div>
-
             <div class="control-group">
                 <label>Filter Verdict</label>
                 <select id="filter-verdict">
@@ -398,7 +364,6 @@
                     <option value="SKIP">Skip</option>
                 </select>
             </div>
-
             <div class="control-group">
                 <label>Min Viability</label>
                 <select id="min-viability">
@@ -408,7 +373,6 @@
                     <option value="8">8+ (Excellent)</option>
                 </select>
             </div>
-
             <div class="control-group">
                 <label>Competition</label>
                 <select id="filter-competition">
@@ -418,12 +382,19 @@
                     <option value="High">High Only</option>
                 </select>
             </div>
-
+            <div class="control-group">
+                <label>Safety Risk</label>
+                <select id="filter-safety">
+                    <option value="all">All Levels</option>
+                    <option value="Low">Low Only</option>
+                    <option value="Medium">Medium Only</option>
+                    <option value="High">High Only</option>
+                </select>
+            </div>
             <div class="control-group">
                 <label>Search</label>
                 <input type="text" id="search-input" placeholder="Search products...">
             </div>
-
             <button id="compare-btn" style="margin-left: auto;">
                 Compare Selected (<span id="selected-count">0</span>)
             </button>
@@ -454,6 +425,7 @@
             verdict: 'all',
             minViability: 0,
             competition: 'all',
+            safety: 'all',
             search: ''
         };
         let currentSort = 'viability';
@@ -462,7 +434,7 @@
         async function init() {
             // Load products from JSON file
             try {
-                const response = await fetch('viability_screening_results.json');
+                const response = await fetch('viability_screening_results_new.json');
                 const data = await response.json();
                 products = data.results || [];
                 updateStats();
@@ -479,7 +451,7 @@
             setupEventListeners();
         }
 
-        // Sample data for demo
+        // Sample data for demo - Updated for new schema
         function getSampleData() {
             return [
                 {
@@ -487,14 +459,32 @@
                     title: "Interactive Baby Elephant - Christmas Gift Interactive Baby Elephant Belly Time Toys",
                     price: 16.13,
                     analysis: {
-                        viability_score: 8,
                         product_quality_score: 7,
                         market_demand_score: 9,
-                        verdict: "RESEARCH FURTHER",
+                        viability_score: 8,
                         competition_level: "Medium",
-                        safety_compliance_risks: { risk_level: "Low" },
+                        safety_risk_level: "Low",
+                        primary_concerns: [
+                            "Competition from established brands",
+                            "Seasonal demand fluctuations",
+                            "Need for safety certifications"
+                        ],
+                        verdict: "RESEARCH FURTHER",
+                        verdict_reasoning: "Strong market demand and good quality score offset medium competition. Christmas gifting potential adds value.",
                         estimated_amazon_price_range: { low: 34.99, high: 49.99 },
-                        primary_concerns: ["Competition", "Seasonality"]
+                        key_selling_points: [
+                            "Interactive features for sensory development",
+                            "Perfect Christmas gift for babies",
+                            "Soft and safe materials",
+                            "Educational belly time toy"
+                        ],
+                        recommended_keywords: [
+                            "baby elephant toy",
+                            "interactive baby toy",
+                            "belly time toys",
+                            "christmas baby gift",
+                            "sensory toys for infants"
+                        ]
                     }
                 },
                 {
@@ -502,14 +492,33 @@
                     title: "54 In 1 Busy Board Montessori Toys For Toddler 1-3",
                     price: 15.64,
                     analysis: {
-                        viability_score: 6,
                         product_quality_score: 5,
                         market_demand_score: 8,
-                        verdict: "RESEARCH FURTHER",
+                        viability_score: 6,
                         competition_level: "High",
-                        safety_compliance_risks: { risk_level: "Medium" },
+                        safety_risk_level: "Medium",
+                        primary_concerns: [
+                            "Intense competition in Montessori toy market",
+                            "Quality concerns with multiple small parts",
+                            "Safety compliance requirements are strict",
+                            "Price pressure from established brands"
+                        ],
+                        verdict: "RESEARCH FURTHER",
+                        verdict_reasoning: "Despite high competition, strong demand for Montessori toys and decent margins make it worth investigating further.",
                         estimated_amazon_price_range: { low: 24.99, high: 39.99 },
-                        primary_concerns: ["Safety Compliance", "Competition"]
+                        key_selling_points: [
+                            "54 different activities in one board",
+                            "Montessori educational approach",
+                            "Develops fine motor skills",
+                            "Portable travel toy"
+                        ],
+                        recommended_keywords: [
+                            "montessori busy board",
+                            "toddler activity board",
+                            "sensory board 1-3 years",
+                            "fine motor skills toys",
+                            "travel busy board"
+                        ]
                     }
                 },
                 {
@@ -517,14 +526,31 @@
                     title: "LED Light Up Drawing Board for Kids Ages 3-12",
                     price: 12.99,
                     analysis: {
-                        viability_score: 4,
                         product_quality_score: 4,
                         market_demand_score: 5,
-                        verdict: "SKIP",
+                        viability_score: 4,
                         competition_level: "High",
-                        safety_compliance_risks: { risk_level: "Low" },
+                        safety_risk_level: "Low",
+                        primary_concerns: [
+                            "Saturated market with many similar products",
+                            "Low profit margins after fees",
+                            "Generic product with no differentiation",
+                            "High return rate for electronic toys"
+                        ],
+                        verdict: "SKIP",
+                        verdict_reasoning: "Low scores across all metrics and intense competition make this product unviable for profitable resale.",
                         estimated_amazon_price_range: { low: 19.99, high: 24.99 },
-                        primary_concerns: ["Low margins", "Saturated market"]
+                        key_selling_points: [
+                            "LED light-up feature",
+                            "Reusable drawing surface",
+                            "Educational art toy"
+                        ],
+                        recommended_keywords: [
+                            "led drawing board",
+                            "light up drawing pad",
+                            "kids art board",
+                            "glow drawing board"
+                        ]
                     }
                 }
             ];
@@ -552,6 +578,11 @@
                 renderProducts();
             });
 
+            document.getElementById('filter-safety').addEventListener('change', (e) => {
+                currentFilters.safety = e.target.value;
+                renderProducts();
+            });
+
             document.getElementById('search-input').addEventListener('input', (e) => {
                 currentFilters.search = e.target.value.toLowerCase();
                 renderProducts();
@@ -564,7 +595,7 @@
         function updateStats() {
             const research = products.filter(p => p.analysis.verdict === 'RESEARCH FURTHER').length;
             const skip = products.filter(p => p.analysis.verdict === 'SKIP').length;
-            const avgViability = products.reduce((sum, p) => sum + p.analysis.viability_score, 0) / products.length || 0;
+            const avgViability = products.reduce((sum, p) => sum + (p.analysis.viability_score || 0), 0) / products.length || 0;
 
             document.getElementById('total-products').textContent = products.length;
             document.getElementById('research-count').textContent = research;
@@ -589,10 +620,20 @@
                 filtered = filtered.filter(p => p.analysis.competition_level === currentFilters.competition);
             }
 
+            if (currentFilters.safety !== 'all') {
+                filtered = filtered.filter(p => p.analysis.safety_risk_level === currentFilters.safety);
+            }
+
             if (currentFilters.search) {
                 filtered = filtered.filter(p =>
                     p.title.toLowerCase().includes(currentFilters.search) ||
-                    p.temu_id.includes(currentFilters.search)
+                    p.temu_id.includes(currentFilters.search) ||
+                    (p.analysis.key_selling_points && p.analysis.key_selling_points.some(ksp =>
+                        ksp.toLowerCase().includes(currentFilters.search)
+                    )) ||
+                    (p.analysis.recommended_keywords && p.analysis.recommended_keywords.some(kw =>
+                        kw.toLowerCase().includes(currentFilters.search)
+                    ))
                 );
             }
 
@@ -613,6 +654,10 @@
                         const roiA = ((a.analysis.estimated_amazon_price_range.high - a.price) / a.price) * 100;
                         const roiB = ((b.analysis.estimated_amazon_price_range.high - b.price) / b.price) * 100;
                         return roiB - roiA;
+                    case 'total':
+                        const totalA = a.analysis.product_quality_score + a.analysis.market_demand_score + a.analysis.viability_score;
+                        const totalB = b.analysis.product_quality_score + b.analysis.market_demand_score + b.analysis.viability_score;
+                        return totalB - totalA;
                     default:
                         return 0;
                 }
@@ -630,7 +675,12 @@
 
         // View product details
         function viewProductDetails(productId) {
-            window.location.href = `product.html?id=${productId}`;
+            // Store current product in sessionStorage for detail page
+            const product = products.find(p => p.temu_id === productId);
+            if (product) {
+                sessionStorage.setItem('currentProduct', JSON.stringify(product));
+                window.location.href = `product-detail.html?id=${productId}`;
+            }
         }
 
         // Render products
@@ -647,6 +697,9 @@
                 const profit = product.analysis.estimated_amazon_price_range.high - product.price;
                 const roi = (profit / product.price * 100).toFixed(0);
                 const isSelected = selectedProducts.has(product.temu_id);
+                const totalScore = product.analysis.product_quality_score +
+                                 product.analysis.market_demand_score +
+                                 product.analysis.viability_score;
 
                 return `
                     <div class="product-card ${isSelected ? 'selected' : ''}"
@@ -687,18 +740,25 @@
                                 <div class="profit-section">
                                     <div>Est: $${product.analysis.estimated_amazon_price_range.low.toFixed(2)} - $${product.analysis.estimated_amazon_price_range.high.toFixed(2)}</div>
                                     <div class="profit-value">Profit: $${profit.toFixed(2)} (${roi}% ROI)</div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 4px;">Total Score: ${totalScore}/30</div>
                                 </div>
 
                                 <div class="meta-info">
                                     <span>Competition: ${product.analysis.competition_level}</span>
-                                    <span>Risk: ${product.analysis.safety_compliance_risks.risk_level}</span>
+                                    <span>Risk: ${product.analysis.safety_risk_level}</span>
                                 </div>
+
+                                ${product.analysis.verdict_reasoning ? `
+                                    <div class="verdict-reasoning">
+                                        <strong>Reasoning:</strong> ${product.analysis.verdict_reasoning}
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                         <div class="product-actions">
                             <button onclick="event.stopPropagation(); toggleSelection('${product.temu_id}')"
                                     style="background: ${isSelected ? '#ef4444' : '#667eea'};">
-                                ${isSelected ? 'Remove from Compare' : 'Add to Compare'}
+                                ${isSelected ? 'Remove' : 'Compare'}
                             </button>
                             <button onclick="viewProductDetails('${product.temu_id}')"
                                     style="background: #10b981;">
@@ -740,12 +800,16 @@
             content.innerHTML = compareProducts.map(product => {
                 const profit = product.analysis.estimated_amazon_price_range.high - product.price;
                 const roi = (profit / product.price * 100).toFixed(0);
+                const totalScore = product.analysis.product_quality_score +
+                                 product.analysis.market_demand_score +
+                                 product.analysis.viability_score;
 
                 return `
                     <div class="product-card">
                         <div class="product-image">
                             <div class="price-badge">$${product.price.toFixed(2)}</div>
-                            <img src="./temu_baby_toys_imgs/${product.temu_id}.jpg" alt="${product.title}" />
+                            <img src="./temu_baby_toys_imgs/${product.temu_id}.jpg" alt="${product.title}"
+                                 onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
                         </div>
                         <div class="product-content">
                             <h3 style="font-size: 16px; margin-bottom: 15px;">${product.title}</h3>
@@ -764,8 +828,16 @@
                                     <td>${product.analysis.market_demand_score}/10</td>
                                 </tr>
                                 <tr>
+                                    <td><strong>Total Score:</strong></td>
+                                    <td>${totalScore}/30</td>
+                                </tr>
+                                <tr>
                                     <td><strong>Competition:</strong></td>
                                     <td>${product.analysis.competition_level}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Safety Risk:</strong></td>
+                                    <td>${product.analysis.safety_risk_level}</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Est. Price:</strong></td>
@@ -786,9 +858,21 @@
                             </table>
 
                             <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-                                <strong>Concerns:</strong><br>
-                                ${product.analysis.primary_concerns.join(', ')}
+                                <strong>Verdict Reasoning:</strong><br>
+                                ${product.analysis.verdict_reasoning || 'No reasoning provided'}
                             </div>
+
+                            <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px;">
+                                <strong>Concerns:</strong><br>
+                                ${product.analysis.primary_concerns.join('<br>• ')}
+                            </div>
+
+                            ${product.analysis.key_selling_points && product.analysis.key_selling_points.length > 0 ? `
+                                <div style="margin-top: 10px; padding: 10px; background: #d1ecf1; border-radius: 5px;">
+                                    <strong>Key Selling Points:</strong><br>
+                                    • ${product.analysis.key_selling_points.slice(0, 3).join('<br>• ')}
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
