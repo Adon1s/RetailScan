@@ -1,2 +1,12 @@
 /temu_baby_toys_imgs/
 /temu_profile/
+# prevent git clean from removing my CSV
+/temu_baby_toys.csv
+# ignore IDE settings
+.idea/
+# ignore macOS Finder metadata
+.DS_Store
+# ignore Python cache directories
+__pycache__/
+# ignore my SSH public key
+sshkey.pub
