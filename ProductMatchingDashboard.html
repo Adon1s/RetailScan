@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Matching Dashboard - Temu vs Amazon</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Controls */
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        select, input, button {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:hover, input:hover, button:hover {
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        /* Match Cards */
+        .match-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .match-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .match-card:hover {
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .confidence-high {
+            border-left: 5px solid #10b981;
+        }
+
+        .confidence-medium {
+            border-left: 5px solid #f59e0b;
+        }
+
+        .confidence-low {
+            border-left: 5px solid #ef4444;
+        }
+
+        .match-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+        }
+
+        .confidence-high .confidence-badge {
+            background: #10b981;
+        }
+
+        .confidence-medium .confidence-badge {
+            background: #f59e0b;
+        }
+
+        .confidence-low .confidence-badge {
+            background: #ef4444;
+        }
+
+        .match-content {
+            display: grid;
+            grid-template-columns: 1fr 150px 1fr;
+            gap: 20px;
+            padding: 20px;
+            align-items: start;
+        }
+
+        .product-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .platform-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 12px;
+            color: white;
+        }
+
+        .temu-badge {
+            background: #ff6b6b;
+        }
+
+        .amazon-badge {
+            background: #ff9500;
+        }
+
+        .price-tag {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .product-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.4;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        .product-id {
+            font-size: 12px;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .match-scores {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .score-item {
+            text-align: center;
+            width: 100%;
+        }
+
+        .score-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .score-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s ease;
+        }
+
+        .score-value {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 3px;
+        }
+
+        .match-actions {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-approve {
+            background: #10b981;
+        }
+
+        .btn-reject {
+            background: #ef4444;
+        }
+
+        .btn-uncertain {
+            background: #f59e0b;
+        }
+
+        /* Price difference indicator */
+        .price-diff {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f0fdf4;
+            border-radius: 5px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .price-diff.negative {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        /* Product links */
+        .product-section a {
+            display: inline-block;
+            margin-top: 5px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .product-section a:hover {
+            text-decoration: underline;
+            transform: translateX(2px);
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .match-content {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .match-scores {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+                padding: 15px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Export section */
+        .export-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>Product Matching Dashboard</h1>
+            <p style="margin-top: 8px;">
+                Review and validate product matches between Temu and Amazon. Use the confidence scores and visual comparison to determine if products are true matches.
+            </p>
+            <div class="stats-grid" id="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-matches">0</div>
+                    <div class="stat-label">Total Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="high-confidence">0</div>
+                    <div class="stat-label">High Confidence (≥0.8)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="medium-confidence">0</div>
+                    <div class="stat-label">Medium (0.6-0.8)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="needs-review">0</div>
+                    <div class="stat-label">Needs Review</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avg-price-diff">$0</div>
+                    <div class="stat-label">Avg Price Difference</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label for="sort-select">Sort By</label>
+                <select id="sort-select">
+                    <option value="confidence-desc">Confidence (High to Low)</option>
+                    <option value="confidence-asc">Confidence (Low to High)</option>
+                    <option value="price-diff-desc">Price Diff (High to Low)</option>
+                    <option value="price-diff-asc">Price Diff (Low to High)</option>
+                    <option value="image-score">Image Similarity</option>
+                    <option value="text-score">Text Similarity</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="filter-confidence">Filter Confidence</label>
+                <select id="filter-confidence">
+                    <option value="all">All Matches</option>
+                    <option value="high">High (≥0.8)</option>
+                    <option value="medium">Medium (0.6-0.8)</option>
+                    <option value="low">Low (<0.6)</option>
+                    <option value="needs-review">Needs Review Only</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="min-confidence">Min Confidence</label>
+                <input type="number" id="min-confidence" min="0" max="1" step="0.1" value="0" style="width: 100px;">
+            </div>
+
+            <div class="control-group">
+                <label for="search-input">Search Products</label>
+                <input type="text" id="search-input" placeholder="Search by title or ID..." style="width: 250px;">
+            </div>
+
+            <button id="export-approved" style="margin-left: auto;">
+                Export Approved Matches
+            </button>
+        </div>
+
+        <!-- Match Grid -->
+        <div id="match-grid" class="match-grid">
+            <div class="loading">Loading matches...</div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="export-section" id="export-section" style="display: none;">
+            <h3>Export Summary</h3>
+            <p>Approved: <span id="approved-count">0</span> | Rejected: <span id="rejected-count">0</span> | Uncertain: <span id="uncertain-count">0</span></p>
+            <button onclick="downloadResults()" style="margin-top: 10px;">Download Results CSV</button>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let matches = [];
+        let filteredMatches = [];
+        let decisions = {}; // Store user decisions
+        let currentSort = 'confidence-desc';
+        let currentFilter = {
+            confidence: 'all',
+            minConfidence: 0,
+            search: ''
+        };
+
+        // Initialize dashboard
+        async function init() {
+            try {
+                // Try to load enriched results first, fall back to original
+                let response = await fetch('matching_results_enriched.json');
+                if (!response.ok) {
+                    console.log('Enriched results not found, loading original...');
+                    response = await fetch('matching_results.json');
+                }
+                const data = await response.json();
+
+                // Handle both formats: array directly or object with matches property
+                if (Array.isArray(data)) {
+                    matches = data;
+                } else if (data.matches && Array.isArray(data.matches)) {
+                    matches = data.matches;
+                } else {
+                    matches = [];
+                }
+
+                console.log(`Loaded ${matches.length} matches`);
+
+                // Load saved decisions from localStorage
+                const saved = localStorage.getItem('matchDecisions');
+                if (saved) {
+                    decisions = JSON.parse(saved);
+                }
+
+                updateStats();
+                applyFilters();
+                renderMatches();
+            } catch (error) {
+                console.error('Error loading matches:', error);
+                document.getElementById('match-grid').innerHTML =
+                    '<div class="empty-state">Error loading matching results. Please ensure matching_results.json is in the same directory.</div>';
+            }
+
+            // Setup event listeners
+            setupEventListeners();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('sort-select').addEventListener('change', (e) => {
+                currentSort = e.target.value;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('filter-confidence').addEventListener('change', (e) => {
+                currentFilter.confidence = e.target.value;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('min-confidence').addEventListener('input', (e) => {
+                currentFilter.minConfidence = parseFloat(e.target.value) || 0;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                currentFilter.search = e.target.value.toLowerCase();
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('export-approved').addEventListener('click', exportApproved);
+        }
+
+        // Update statistics
+        function updateStats() {
+            const highConf = matches.filter(m => m.confidence >= 0.8).length;
+            const mediumConf = matches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8).length;
+            const needsReview = matches.filter(m => m.needs_review).length;
+
+            // Calculate average price difference
+            let totalDiff = 0;
+            let count = 0;
+            matches.forEach(m => {
+                const temuPrice = m.temu_price || m.price || 0;
+                const amazonPrice = m.amazon_price || 0;
+                if (temuPrice && amazonPrice) {
+                    totalDiff += Math.abs(amazonPrice - temuPrice);
+                    count++;
+                }
+            });
+            const avgDiff = count > 0 ? totalDiff / count : 0;
+
+            document.getElementById('total-matches').textContent = matches.length;
+            document.getElementById('high-confidence').textContent = highConf;
+            document.getElementById('medium-confidence').textContent = mediumConf;
+            document.getElementById('needs-review').textContent = needsReview;
+            document.getElementById('avg-price-diff').textContent = `$${avgDiff.toFixed(2)}`;
+
+            // Update export stats
+            updateExportStats();
+        }
+
+        // Apply filters and sorting
+        function applyFilters() {
+            filteredMatches = [...matches];
+
+            // Apply confidence filter
+            if (currentFilter.confidence !== 'all') {
+                if (currentFilter.confidence === 'high') {
+                    filteredMatches = filteredMatches.filter(m => m.confidence >= 0.8);
+                } else if (currentFilter.confidence === 'medium') {
+                    filteredMatches = filteredMatches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8);
+                } else if (currentFilter.confidence === 'low') {
+                    filteredMatches = filteredMatches.filter(m => m.confidence < 0.6);
+                } else if (currentFilter.confidence === 'needs-review') {
+                    filteredMatches = filteredMatches.filter(m => m.needs_review);
+                }
+            }
+
+            // Apply minimum confidence filter
+            filteredMatches = filteredMatches.filter(m => m.confidence >= currentFilter.minConfidence);
+
+            // Apply search filter
+            if (currentFilter.search) {
+                filteredMatches = filteredMatches.filter(m => {
+                    const searchStr = currentFilter.search;
+                    return (
+                        m.temu_id.toLowerCase().includes(searchStr) ||
+                        m.amazon_id.toLowerCase().includes(searchStr) ||
+                        (m.temu_title && m.temu_title.toLowerCase().includes(searchStr)) ||
+                        (m.amazon_title && m.amazon_title.toLowerCase().includes(searchStr))
+                    );
+                });
+            }
+
+            // Apply sorting
+            filteredMatches.sort((a, b) => {
+                switch (currentSort) {
+                    case 'confidence-desc':
+                        return b.confidence - a.confidence;
+                    case 'confidence-asc':
+                        return a.confidence - b.confidence;
+                    case 'price-diff-desc':
+                        const bDiffDesc = Math.abs((b.amazon_price || 0) - (b.temu_price || b.price || 0));
+                        const aDiffDesc = Math.abs((a.amazon_price || 0) - (a.temu_price || a.price || 0));
+                        return bDiffDesc - aDiffDesc;
+                    case 'price-diff-asc':
+                        const aDiffAsc = Math.abs((a.amazon_price || 0) - (a.temu_price || a.price || 0));
+                        const bDiffAsc = Math.abs((b.amazon_price || 0) - (b.temu_price || b.price || 0));
+                        return aDiffAsc - bDiffAsc;
+                    case 'image-score':
+                        return (b.scores?.image || 0) - (a.scores?.image || 0);
+                    case 'text-score':
+                        return (b.scores?.embedding || 0) - (a.scores?.embedding || 0);
+                    default:
+                        return 0;
+                }
+            });
+        }
+
+        // Get confidence class
+        function getConfidenceClass(confidence) {
+            if (confidence >= 0.8) return 'confidence-high';
+            if (confidence >= 0.6) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        // Render matches
+        function renderMatches() {
+            const grid = document.getElementById('match-grid');
+
+            if (filteredMatches.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
+                return;
+            }
+
+            grid.innerHTML = filteredMatches.map(match => {
+                const confClass = getConfidenceClass(match.confidence);
+                const matchKey = `${match.temu_id}_${match.amazon_id}`;
+                const decision = decisions[matchKey];
+                const temuPrice = match.temu_price || match.price || 0;
+                const amazonPrice = match.amazon_price || 0;
+                const priceDiff = amazonPrice - temuPrice;
+                const priceDiffPercent = temuPrice ? ((priceDiff / temuPrice) * 100).toFixed(0) : 0;
+
+                return `
+                    <div class="match-card ${confClass}" data-match-key="${matchKey}">
+                        <div class="match-header">
+                            <div>
+                                <span class="confidence-badge">
+                                    ${Math.min(match.confidence * 100, 100).toFixed(1)}% Confidence
+                                </span>
+                                <span style="margin-left: 10px; font-size: 12px; color: #666;">
+                                    ${match.match_method || 'Combined Match'}
+                                </span>
+                            </div>
+                            <div style="font-size: 12px; color: #666;">
+                                ${decision ? `Decision: ${decision}` : 'Pending Review'}
+                            </div>
+                        </div>
+
+                        <div class="match-content">
+                            <!-- Temu Product -->
+                            <div class="product-section">
+                                <div class="product-image">
+                                    <span class="platform-badge temu-badge">TEMU</span>
+                                    <span class="price-tag">${temuPrice.toFixed(2)}</span>
+                                    <img src="./temu_baby_toys_imgs/${match.temu_id}.jpg"
+                                         alt="${match.temu_title || 'Temu Product'}"
+                                         onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
+                                </div>
+                                <div class="product-title">${match.temu_title || `Temu Product ${match.temu_id}`}</div>
+                                <div class="product-id">ID: ${match.temu_id}</div>
+                                <a href="https://www.temu.com/search_result.html?search_key=${match.temu_id}" target="_blank" style="font-size: 12px; color: #667eea;">Search on Temu →</a>
+                            </div>
+
+                            <!-- Match Scores -->
+                            <div class="match-scores">
+                                ${match.scores ? `
+                                    <div class="score-item">
+                                        <div class="score-label">Text Match</div>
+                                        <div class="score-bar">
+                                            <div class="score-fill" style="width: ${Math.min(match.scores.fuzzy || 0, 100)}%"></div>
+                                        </div>
+                                        <div class="score-value">${Math.min(match.scores.fuzzy || 0, 100).toFixed(1)}%</div>
+                                    </div>
+                                    <div class="score-item">
+                                        <div class="score-label">Semantic</div>
+                                        <div class="score-bar">
+                                            <div class="score-fill" style="width: ${Math.min((match.scores.embedding || 0) * 100, 100)}%"></div>
+                                        </div>
+                                        <div class="score-value">${Math.min((match.scores.embedding || 0) * 100, 100).toFixed(1)}%</div>
+                                    </div>
+                                    <div class="score-item">
+                                        <div class="score-label">Image</div>
+                                        <div class="score-bar">
+                                            <div class="score-fill" style="width: ${Math.min((match.scores.image || 0) * 100, 100)}%"></div>
+                                        </div>
+                                        <div class="score-value">${Math.min((match.scores.image || 0) * 100, 100).toFixed(1)}%</div>
+                                    </div>
+                                ` : `
+                                    <div class="score-value" style="font-size: 16px;">
+                                        ${Math.min(match.confidence * 100, 100).toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 12px; color: #666;">Overall Match</div>
+                                `}
+
+                                <div class="price-diff ${priceDiff < 0 ? 'negative' : ''}">
+                                    Price Diff: ${priceDiff >= 0 ? '+' : ''}$${priceDiff.toFixed(2)}
+                                    <br>
+                                    <small>(${priceDiffPercent >= 0 ? '+' : ''}${priceDiffPercent}%)</small>
+                                </div>
+                            </div>
+
+                            <!-- Amazon Product -->
+                            <div class="product-section">
+                                <div class="product-image">
+                                    <span class="platform-badge amazon-badge">AMAZON</span>
+                                    <span class="price-tag">${amazonPrice.toFixed(2)}</span>
+                                    <img src="./amazon_baby_toys_imgs/${match.amazon_id}.jpg"
+                                         alt="${match.amazon_title || 'Amazon Product'}"
+                                         onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
+                                </div>
+                                <div class="product-title">${match.amazon_title || `Amazon Product ${match.amazon_id}`}</div>
+                                <div class="product-id">ASIN: ${match.amazon_id}</div>
+                                <a href="https://www.amazon.com/dp/${match.amazon_id}" target="_blank" style="font-size: 12px; color: #667eea;">View on Amazon →</a>
+                            </div>
+                        </div>
+
+                        <div class="match-actions">
+                            <button class="btn-approve" onclick="setDecision('${matchKey}', 'approved')">
+                                ✓ Approve Match
+                            </button>
+                            <button class="btn-uncertain" onclick="setDecision('${matchKey}', 'uncertain')">
+                                ? Uncertain
+                            </button>
+                            <button class="btn-reject" onclick="setDecision('${matchKey}', 'rejected')">
+                                ✗ Reject Match
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Set decision for a match
+        function setDecision(matchKey, decision) {
+            decisions[matchKey] = decision;
+            localStorage.setItem('matchDecisions', JSON.stringify(decisions));
+
+            // Update the card UI
+            const card = document.querySelector(`[data-match-key="${matchKey}"]`);
+            if (card) {
+                const header = card.querySelector('.match-header > div:last-child');
+                header.textContent = `Decision: ${decision}`;
+            }
+
+            updateExportStats();
+        }
+
+        // Update export statistics
+        function updateExportStats() {
+            const approved = Object.values(decisions).filter(d => d === 'approved').length;
+            const rejected = Object.values(decisions).filter(d => d === 'rejected').length;
+            const uncertain = Object.values(decisions).filter(d => d === 'uncertain').length;
+
+            document.getElementById('approved-count').textContent = approved;
+            document.getElementById('rejected-count').textContent = rejected;
+            document.getElementById('uncertain-count').textContent = uncertain;
+
+            // Show export section if there are decisions
+            document.getElementById('export-section').style.display =
+                (approved + rejected + uncertain) > 0 ? 'block' : 'none';
+        }
+
+        // Export approved matches
+        function exportApproved() {
+            const approved = matches.filter(m => {
+                const matchKey = `${m.temu_id}_${m.amazon_id}`;
+                return decisions[matchKey] === 'approved';
+            });
+
+            if (approved.length === 0) {
+                alert('No approved matches to export. Please approve some matches first.');
+                return;
+            }
+
+            // Create CSV content
+            const headers = ['temu_id', 'amazon_id', 'confidence', 'temu_price', 'amazon_price', 'price_difference', 'match_method', 'temu_title', 'amazon_title'];
+            const rows = approved.map(m => [
+                m.temu_id,
+                m.amazon_id,
+                m.confidence.toFixed(3),
+                (m.temu_price || m.price || 0).toFixed(2),
+                (m.amazon_price || 0).toFixed(2),
+                ((m.amazon_price || 0) - (m.temu_price || m.price || 0)).toFixed(2),
+                m.match_method || 'combined',
+                `"${(m.temu_title || '').replace(/"/g, '""')}"`,
+                `"${(m.amazon_title || '').replace(/"/g, '""')}"`
+            ]);
+
+            const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `approved_matches_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Download all results with decisions
+        function downloadResults() {
+            const results = matches.map(m => {
+                const matchKey = `${m.temu_id}_${m.amazon_id}`;
+                return {
+                    ...m,
+                    decision: decisions[matchKey] || 'pending'
+                };
+            });
+
+            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `match_decisions_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
