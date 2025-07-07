@@ -6,6 +6,12 @@ import csv
 import json
 from pathlib import Path
 from datetime import datetime
+import sys
+
+# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 # Configuration
 CSV_FILE = Path("temu_baby_toys.csv")
@@ -59,10 +65,10 @@ def load_and_analyze_products():
         reader = csv.DictReader(f)
 
         for row in reader:
-            # Basic product info
-            temu_id = row['temu_id']
+            # Basic product info  ── accepts either old (`temu_id`) or new (`product_id`) header
+            temu_id = row.get('temu_id') or row.get('product_id')
             title = row['title']
-            price = float(row['price']) if row['price'] else 0.0
+            price = float(row['price']) if row.get('price') else 0.0
 
             # Check if image exists locally
             image_exists = (IMAGES_DIR / f"{temu_id}.jpg").exists()

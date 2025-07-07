@@ -10,3 +10,4 @@
 __pycache__/
 # ignore my SSH public key
 sshkey.pub
+/pipeline_log/

@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Dict, Optional, List
 import time
 import warnings
+import sys
+
+# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL')
 
