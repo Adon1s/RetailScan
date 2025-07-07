@@ -1,6 +1,7 @@
 """
 Temu scraper — Playwright stealth + persistent profile
-Fixed to capture image URLs and complete product URLs
+Outputs **exactly** the same unified CSV schema as the Amazon scraper:
+product_id,source,title,price,image_url,product_url
 """
 import asyncio
 import csv
@@ -8,14 +9,13 @@ import random
 import re
 from pathlib import Path
 from typing import Dict, List
+
 import requests
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SEARCH_URL = (
-    "https://www.temu.com/search_result.html?search_key=baby%20toys&search_method=user"
-)
+SEARCH_URL = "https://www.temu.com/search_result.html?search_key=baby%20toys&search_method=user"
 BASE_URL = "https://www.temu.com"
 PROFILE_DIR = Path("temu_profile")
 OUT_DIR = Path("temu_baby_toys_imgs")
@@ -26,320 +26,197 @@ UA_STRING = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 
+# Unified CSV header
+FIELDNAMES = [
+    "product_id",  # numeric Temu id
+    "source",      # "temu"
+    "title",
+    "price",       # two‑decimal string
+    "image_url",
+    "product_url",
+]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def dl_image(row: Dict, dest: Path) -> None:
-    dest.mkdir(exist_ok=True)
-    file_path = dest / f"{row['temu_id']}.jpg"
 
+def save_to_csv(rows: List[Dict], csv_file: Path):
+    if not rows:
+        print("No products to save")
+        return
+    with csv_file.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({
+                "product_id": r["product_id"],
+                "source":     r["source"],
+                "title":      r["title"].strip()[:200],
+                "price":      f"{float(r['price']):.2f}",
+                "image_url":  r.get("image_url", ""),
+                "product_url": r["product_url"],
+            })
+    # sanity check
+    with csv_file.open("r", encoding="utf-8") as f:
+        assert f.readline().strip() == ",".join(FIELDNAMES), "CSV header mismatch"
+    print(f"📄 CSV saved → {csv_file}")
+
+
+def clean_title(text: str) -> str:
+    text = re.sub(r"^Local\s*\n?", "", text, flags=re.I)
+    text = re.sub(r"\s+", " ", text).replace("\n", " ").replace("\r", " ")
+    return text.strip()[:200]
+
+
+def dl_image(row: Dict, dest: Path):
+    dest.mkdir(exist_ok=True)
+    file_path = dest / f"{row['product_id']}.jpg"
     if file_path.exists() or not row["image_url"]:
         return
-
-    headers = {
-        "User-Agent": UA_STRING,
-        "Referer": "https://www.temu.com/",
-        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
-
     try:
-        r = requests.get(row["image_url"], headers=headers, timeout=15)
+        r = requests.get(row["image_url"], headers={"User-Agent": UA_STRING}, timeout=15)
         r.raise_for_status()
         file_path.write_bytes(r.content)
     except Exception as exc:
-        print(f"✗ {row['temu_id']} {exc}")
+        print(f"✗ {row['product_id']} {exc}")
 
 
 async def smooth_scroll(page, rounds: int = 25):
-    """Smooth scrolling to load all products"""
     last_height = await page.evaluate("document.body.scrollHeight")
-
     for i in range(rounds):
         await page.mouse.wheel(0, 900)
         await asyncio.sleep(random.uniform(1.2, 2.4))
-
         new_height = await page.evaluate("document.body.scrollHeight")
         if new_height == last_height:
-            # Try once more with a different scroll
             await page.evaluate("window.scrollBy(0, -500)")
             await asyncio.sleep(0.5)
             await page.mouse.wheel(0, 1000)
             await asyncio.sleep(1)
-
-            final_height = await page.evaluate("document.body.scrollHeight")
-            if final_height == new_height:
+            if await page.evaluate("document.body.scrollHeight") == new_height:
                 break
-
         last_height = new_height
-
-        # Print progress
         if (i + 1) % 5 == 0:
-            print(f"  Scrolled {i + 1} times...")
+            print(f"  Scrolled {i + 1} times…")
 
 
 async def wait_for_images(page):
-    """Wait for images to load"""
-    print("Waiting for images to load...")
-
-    # Wait for at least some images to have src attributes
+    print("Waiting for images…")
     await page.wait_for_function(
-        """
-        () => {
-            const images = document.querySelectorAll('img');
-            const loadedImages = Array.from(images).filter(img => 
-                img.src && 
-                img.src.startsWith('http') && 
-                (img.src.includes('images.temu.com') || img.src.includes('img.kwcdn.com'))
-            );
-            return loadedImages.length > 5;
-        }
-        """,
-        timeout=30000
+        """() => [...document.querySelectorAll('img')]
+              .filter(i => i.src && /temu\.com|kwcdn\.com/.test(i.src)).length > 5""",
+        timeout=30_000,
     )
-
-    # Additional wait to ensure images are fully loaded
     await asyncio.sleep(2)
 
 
-async def extract(page) -> List[Dict]:
-    """Extract product information with proper image and URL handling"""
-    # First wait for images to load
+async def extract(page):
     await wait_for_images(page)
+    products, seen = [], set()
+    containers = await page.query_selector_all("div[data-tooltip-title], div[class*='goods-item'], div[class*='product-item']")
+    print(f"Found {len(containers)} potential containers")
 
-    # Get all product containers
-    products = []
-    seen = set()
-
-    # Try multiple selectors for product containers
-    product_containers = await page.query_selector_all(
-        "div[data-tooltip-title], div[class*='goods-item'], div[class*='product-item']"
-    )
-
-    print(f"Found {len(product_containers)} potential product containers")
-
-    for container in product_containers:
+    for c in containers:
         try:
-            # Find the link within the container
-            link = await container.query_selector("a[href*='g-']")
+            link = await c.query_selector("a[href*='g-']")
             if not link:
                 continue
-
-            href = await link.get_attribute("href")
-            if not href:
-                continue
-
-            # Extract product ID
+            href = await link.get_attribute("href") or ""
             m = re.search(r"-g-(\d+)\.html", href)
             if not m:
                 continue
-
             pid = m.group(1)
             if pid in seen:
                 continue
-
             seen.add(pid)
-
-            # Build full URL
             full_url = href if href.startswith("http") else BASE_URL + href
-
-            # Find image with multiple strategies
+            # image
             img_url = ""
-
-            # Strategy 1: Direct img tag within the link
-            img_el = await link.query_selector("img")
-            if img_el:
-                img_url = await img_el.get_attribute("src")
-
-            # Strategy 2: Look for image in the container
-            if not img_url:
-                img_el = await container.query_selector("img[src*='images.temu.com'], img[src*='img.kwcdn.com']")
-                if img_el:
-                    img_url = await img_el.get_attribute("src")
-
-            # Strategy 3: Get the first image with http URL
-            if not img_url:
-                all_imgs = await container.query_selector_all("img")
-                for img in all_imgs:
-                    src = await img.get_attribute("src")
-                    if src and src.startswith("http"):
-                        img_url = src
+            for sel in ["img", "img[src*='kwcdn.com']"]:
+                img = await c.query_selector(sel)
+                if img:
+                    img_url = await img.get_attribute("src") or await img.get_attribute("data-src") or ""
+                    if img_url:
                         break
-
-            # Strategy 4: Check data-src attribute (lazy loading)
-            if not img_url:
-                img_el = await container.query_selector("img[data-src]")
-                if img_el:
-                    img_url = await img_el.get_attribute("data-src")
-
-            # Get title text
-            title_text = ""
-
-            # Try to get title from link text
-            title_text = (await link.inner_text() or "").strip()
-
-            # If no title, try other selectors
-            if not title_text or len(title_text) < 5:
-                title_el = await container.query_selector("[class*='title'], [class*='name'], h2, h3")
-                if title_el:
-                    title_text = (await title_el.inner_text() or "").strip()
-
-            # Default title if still empty
-            if not title_text:
-                title_text = f"Product {pid}"
-
-            # ── Price ────────────────────────────────────────────
-            price = 0.0  # default initial
-
-            # Candidate selectors ordered by reliability
-            candidate_selectors = [
-                "div[data-type='price'][aria-label]",  # primary: aria‑label carries "$"
-                "[data-price]",                        # explicit data-price attribute
-                "[class*='price']",                    # generic class name
-                "[class*='Price']",
+            # title
+            title = (await link.inner_text()).strip()
+            if len(title) < 5:
+                t_el = await c.query_selector("[class*='title'], [class*='name'], h2, h3")
+                title = (await t_el.inner_text()).strip() if t_el else ""
+            title = clean_title(title) or f"Temu Baby Toy {pid}"
+            # price
+            price = 0.0
+            cand = [
+                "div[data-type='price'][aria-label]",
+                "[data-price]",
+                "[class*='price']",
             ]
-
-            raw_price_text = ""
-            selected_el = None
-            for sel in candidate_selectors:
-                el = await container.query_selector(sel)
+            for sel in cand:
+                el = await c.query_selector(sel)
                 if not el:
                     continue
-
-                selected_el = el  # remember for deeper fallback
-
-                # Priority: aria‑label → data‑price → innerText
-                raw_price_text = (
-                    await el.get_attribute("aria-label")
-                    or await el.get_attribute("data-price")
-                    or await el.inner_text()
-                    or ""
-                )
-
-                m_price = re.search(r"[\d]+(?:[\d,]*)(?:\.\d+)?", raw_price_text)
-                if m_price:
-                    price = float(m_price.group().replace(",", ""))
-                    break  # price found
-
-            # Deeper fallback: combine nested <span> texts inside the selected price element
-            if price == 0.0 and selected_el is not None:
-                spans = await selected_el.query_selector_all("span")
-                nested_text = ""
-                for sp in spans:
-                    nested_text += (await sp.inner_text() or "").strip()
-                m_price = re.search(r"([\d]+(?:[\d,]*)(?:\.\d+)?)", nested_text)
-                if m_price:
-                    price = float(m_price.group(1).replace(",", ""))
-
-            # Final fallback: regex over the entire container HTML
+                raw = (await el.get_attribute("aria-label")) or (await el.get_attribute("data-price")) or (await el.inner_text())
+                m_p = re.search(r"\d+[\d,]*(?:\.\d+)?", raw or "")
+                if m_p:
+                    price = float(m_p.group().replace(",", ""))
+                    break
             if price == 0.0:
-                html_snippet = await container.inner_html()
-                m_price = re.search(r"\$?\s*([\d]+(?:[\d,]*)(?:\.\d+)?)", html_snippet)
-                if m_price:
-                    price = float(m_price.group(1).replace(",", ""))
-
+                html = await c.inner_html()
+                m_p = re.search(r"\d+[\d,]*(?:\.\d+)?", html)
+                if m_p:
+                    price = float(m_p.group().replace(",", ""))
             products.append({
-                "temu_id": pid,
-                "title": title_text[:200],  # Limit title length
+                "product_id": pid,
+                "source": "temu",
+                "title": title,
                 "price": price,
                 "image_url": img_url,
                 "product_url": full_url,
             })
-
-        except Exception as e:
-            # Continue on error for individual products
+        except Exception:
             continue
-
     return products
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 async def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    print("Temu Scraper - Starting...")
-    print("=" * 60)
+    print("Temu scraper starting…\n" + "=" * 60)
 
     async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
+        ctx = await pw.chromium.launch_persistent_context(
             PROFILE_DIR,
             headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--disable-features=IsolateOrigins,site-per-process"
-            ],
+            args=["--disable-blink-features=AutomationControlled"],
             viewport={"width": 1280, "height": 780},
             user_agent=UA_STRING,
             locale="en-US",
         )
-
-        page = await context.new_page()
-
-        # Enable image loading (in case it's disabled)
-        await page.route("**/*", lambda route: route.continue_())
-
-        print(f"Navigating to: {SEARCH_URL}")
+        page = await ctx.new_page()
+        await page.route("**/*", lambda r: r.continue_())
+        print(f"Navigating to {SEARCH_URL}")
         await page.goto(SEARCH_URL, wait_until="networkidle")
-
-        # Wait for initial content
         try:
-            await page.wait_for_selector(
-                "img, div[data-tooltip-title]",
-                timeout=120000,
-            )
+            await page.wait_for_selector("img, div[data-tooltip-title]", timeout=120_000)
         except PWTimeout:
-            print("Timeout: products did not load — complete login and retry.")
-            await context.close()
+            print("Timeout: no products loaded.")
             return
-
-        # Additional wait for dynamic content
         await asyncio.sleep(3)
-
-        print("Scrolling to load all products...")
         await smooth_scroll(page)
-
-        print("Extracting products...")
+        print("Extracting…")
         products = await extract(page)
-
         print(f"✓ Scraped {len(products)} products")
-
-        # Debug: Print first few products to check data
         if products:
-            print("\nSample products:")
-            for p in products[:3]:
-                print(f"  ID: {p['temu_id']}")
-                print(f"  Title: {p['title'][:50]}...")
-                print(f"  Price: ${p['price']}")
-                print(f"  Image: {p['image_url'][:50]}..." if p['image_url'] else "  Image: No image")
-                print(f"  URL: {p['product_url'][:50]}...")
-                print()
-
-        if products:
-            # Save to CSV
-            with CSV_FILE.open("w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=products[0].keys())
-                writer.writeheader()
-                writer.writerows(products)
-            print(f"📄 CSV saved → {CSV_FILE}")
-
-            # Download images
-            print("\n🖼️  Downloading images...")
+            save_to_csv(products, CSV_FILE)
+            print("\n🖼️  Downloading images…")
             from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            # Filter products with valid image URLs
-            products_with_images = [p for p in products if p['image_url']]
-            print(f"Found {len(products_with_images)} products with images")
-
+            pics = [p for p in products if p["image_url"]]
             with ThreadPoolExecutor(max_workers=8) as pool:
-                futures = [pool.submit(dl_image, p, OUT_DIR) for p in products_with_images]
-                for _ in tqdm(as_completed(futures), total=len(futures), unit="img"):
+                fut = [pool.submit(dl_image, p, OUT_DIR) for p in pics]
+                for _ in tqdm(as_completed(fut), total=len(fut), unit="img"):
                     pass
-
-            print(f"✅ Images stored in {OUT_DIR}")
+            print(f"✅ Images saved to {OUT_DIR}")
         else:
             print("❌ No products extracted — selectors may need update.")
-
-        print("\n🚪 Close the browser window to end session.")
-        await context.close()
+        print("\nClose the browser to finish.")
+        await ctx.close()
 
 
 if __name__ == "__main__":

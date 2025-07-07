@@ -58,6 +58,26 @@
             opacity: 0.9;
         }
 
+        /* LLM Stats Section */
+        .llm-stats {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .has-llm-data .llm-stats {
+            display: grid;
+        }
+
+        .llm-stat-card {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
         /* Controls */
         .controls {
             background: white;
@@ -148,6 +168,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .confidence-badge {
@@ -169,6 +198,58 @@
 
         .confidence-low .confidence-badge {
             background: #ef4444;
+        }
+
+        /* LLM Badges */
+        .llm-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: help;
+            transition: all 0.2s;
+        }
+
+        .llm-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .llm-same {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .llm-different {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .llm-pending {
+            background: #e0e7ff;
+            color: #3730a3;
+            border: 1px solid #c7d2fe;
+        }
+
+        /* LLM Rationale Tooltip */
+        .llm-rationale {
+            display: none;
+            position: absolute;
+            background: #1f2937;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            max-width: 300px;
+            z-index: 1000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            margin-top: 5px;
+        }
+
+        .llm-badge:hover .llm-rationale {
+            display: block;
         }
 
         .match-content {
@@ -291,6 +372,13 @@
             font-size: 12px;
             font-weight: bold;
             margin-top: 3px;
+        }
+
+        /* LLM Score Section */
+        .llm-score-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
         }
 
         .match-actions {
@@ -416,6 +504,22 @@
                     <div class="stat-label">Avg Price Difference</div>
                 </div>
             </div>
+
+            <!-- LLM Stats (only shown if LLM data exists) -->
+            <div class="llm-stats" id="llm-stats">
+                <div class="llm-stat-card">
+                    <div class="stat-value" id="llm-processed">0</div>
+                    <div class="stat-label">LLM Processed</div>
+                </div>
+                <div class="llm-stat-card">
+                    <div class="stat-value" id="llm-same">0</div>
+                    <div class="stat-label">LLM: Same Product</div>
+                </div>
+                <div class="llm-stat-card">
+                    <div class="stat-value" id="llm-different">0</div>
+                    <div class="stat-label">LLM: Different</div>
+                </div>
+            </div>
         </div>
 
         <!-- Controls -->
@@ -429,6 +533,7 @@
                     <option value="price-diff-asc">Price Diff (Low to High)</option>
                     <option value="image-score">Image Similarity</option>
                     <option value="text-score">Text Similarity</option>
+                    <option value="llm-verdict">LLM Verdict</option>
                 </select>
             </div>
 
@@ -440,6 +545,9 @@
                     <option value="medium">Medium (0.6-0.8)</option>
                     <option value="low">Low (<0.6)</option>
                     <option value="needs-review">Needs Review Only</option>
+                    <option value="llm-same">LLM: Same Products</option>
+                    <option value="llm-different">LLM: Different Products</option>
+                    <option value="llm-pending">LLM: Not Processed</option>
                 </select>
             </div>
 
@@ -504,6 +612,11 @@
                 }
 
                 console.log(`Loaded ${matches.length} matches`);
+
+                // Check if we have LLM data
+                if (matches.some(m => m.llm_processed)) {
+                    document.body.classList.add('has-llm-data');
+                }
 
                 // Load saved decisions from localStorage
                 const saved = localStorage.getItem('matchDecisions');
@@ -578,8 +691,40 @@
             document.getElementById('needs-review').textContent = needsReview;
             document.getElementById('avg-price-diff').textContent = `$${avgDiff.toFixed(2)}`;
 
+            // Update LLM stats if available
+            const llmProcessed = matches.filter(m => m.llm_processed).length;
+            if (llmProcessed > 0) {
+                const llmSame = matches.filter(m => m.llm_same_product).length;
+                const llmDifferent = matches.filter(m => m.llm_processed && !m.llm_same_product).length;
+
+                document.getElementById('llm-processed').textContent = llmProcessed;
+                document.getElementById('llm-same').textContent = llmSame;
+                document.getElementById('llm-different').textContent = llmDifferent;
+            }
+
             // Update export stats
             updateExportStats();
+        }
+
+        // Get LLM badge HTML
+        function getLLMBadge(match) {
+            if (!match.llm_processed) {
+                return '<span class="llm-badge llm-pending">⏳ LLM Pending</span>';
+            }
+
+            const rationale = match.llm_rationale || 'No rationale provided';
+
+            if (match.llm_same_product) {
+                return `<span class="llm-badge llm-same" title="${rationale}">
+                            ✓ LLM: Same Product
+                            <div class="llm-rationale">${rationale}</div>
+                        </span>`;
+            } else {
+                return `<span class="llm-badge llm-different" title="${rationale}">
+                            ✗ LLM: Different
+                            <div class="llm-rationale">${rationale}</div>
+                        </span>`;
+            }
         }
 
         // Apply filters and sorting
@@ -596,6 +741,12 @@
                     filteredMatches = filteredMatches.filter(m => m.confidence < 0.6);
                 } else if (currentFilter.confidence === 'needs-review') {
                     filteredMatches = filteredMatches.filter(m => m.needs_review);
+                } else if (currentFilter.confidence === 'llm-same') {
+                    filteredMatches = filteredMatches.filter(m => m.llm_processed && m.llm_same_product);
+                } else if (currentFilter.confidence === 'llm-different') {
+                    filteredMatches = filteredMatches.filter(m => m.llm_processed && !m.llm_same_product);
+                } else if (currentFilter.confidence === 'llm-pending') {
+                    filteredMatches = filteredMatches.filter(m => !m.llm_processed);
                 }
             }
 
@@ -634,6 +785,11 @@
                         return (b.scores?.image || 0) - (a.scores?.image || 0);
                     case 'text-score':
                         return (b.scores?.embedding || 0) - (a.scores?.embedding || 0);
+                    case 'llm-verdict':
+                        // Sort by LLM verdict: Different first, then Same, then not processed
+                        const aScore = a.llm_processed ? (a.llm_same_product ? 2 : 0) : 1;
+                        const bScore = b.llm_processed ? (b.llm_same_product ? 2 : 0) : 1;
+                        return aScore - bScore;
                     default:
                         return 0;
                 }
@@ -668,11 +824,12 @@
                 return `
                     <div class="match-card ${confClass}" data-match-key="${matchKey}">
                         <div class="match-header">
-                            <div>
+                            <div class="header-left">
                                 <span class="confidence-badge">
                                     ${Math.min(match.confidence * 100, 100).toFixed(1)}% Confidence
                                 </span>
-                                <span style="margin-left: 10px; font-size: 12px; color: #666;">
+                                ${getLLMBadge(match)}
+                                <span style="font-size: 12px; color: #666;">
                                     ${match.match_method || 'Combined Match'}
                                 </span>
                             </div>
@@ -686,7 +843,7 @@
                             <div class="product-section">
                                 <div class="product-image">
                                     <span class="platform-badge temu-badge">TEMU</span>
-                                    <span class="price-tag">${temuPrice.toFixed(2)}</span>
+                                    <span class="price-tag">$${temuPrice.toFixed(2)}</span>
                                     <img src="./temu_baby_toys_imgs/${match.temu_id}.jpg"
                                          alt="${match.temu_title || 'Temu Product'}"
                                          onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
@@ -727,6 +884,18 @@
                                     <div style="font-size: 12px; color: #666;">Overall Match</div>
                                 `}
 
+                                ${match.llm_processed && match.llm_image_similarity !== undefined ? `
+                                    <div class="llm-score-section">
+                                        <div class="score-item">
+                                            <div class="score-label">LLM Image Sim</div>
+                                            <div class="score-bar">
+                                                <div class="score-fill" style="width: ${Math.min(match.llm_image_similarity * 100, 100)}%; background: #8b5cf6;"></div>
+                                            </div>
+                                            <div class="score-value">${Math.min(match.llm_image_similarity * 100, 100).toFixed(1)}%</div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+
                                 <div class="price-diff ${priceDiff < 0 ? 'negative' : ''}">
                                     Price Diff: ${priceDiff >= 0 ? '+' : ''}$${priceDiff.toFixed(2)}
                                     <br>
@@ -738,7 +907,7 @@
                             <div class="product-section">
                                 <div class="product-image">
                                     <span class="platform-badge amazon-badge">AMAZON</span>
-                                    <span class="price-tag">${amazonPrice.toFixed(2)}</span>
+                                    <span class="price-tag">$${amazonPrice.toFixed(2)}</span>
                                     <img src="./amazon_baby_toys_imgs/${match.amazon_id}.jpg"
                                          alt="${match.amazon_title || 'Amazon Product'}"
                                          onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
@@ -808,7 +977,7 @@
             }
 
             // Create CSV content
-            const headers = ['temu_id', 'amazon_id', 'confidence', 'temu_price', 'amazon_price', 'price_difference', 'match_method', 'temu_title', 'amazon_title'];
+            const headers = ['temu_id', 'amazon_id', 'confidence', 'temu_price', 'amazon_price', 'price_difference', 'match_method', 'llm_verdict', 'llm_rationale', 'temu_title', 'amazon_title'];
             const rows = approved.map(m => [
                 m.temu_id,
                 m.amazon_id,
@@ -817,6 +986,8 @@
                 (m.amazon_price || 0).toFixed(2),
                 ((m.amazon_price || 0) - (m.temu_price || m.price || 0)).toFixed(2),
                 m.match_method || 'combined',
+                m.llm_processed ? (m.llm_same_product ? 'same' : 'different') : 'not_processed',
+                m.llm_rationale ? `"${m.llm_rationale.replace(/"/g, '""')}"` : '',
                 `"${(m.temu_title || '').replace(/"/g, '""')}"`,
                 `"${(m.amazon_title || '').replace(/"/g, '""')}"`
             ]);

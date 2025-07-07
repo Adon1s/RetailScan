@@ -17,6 +17,12 @@ import torch
 from PIL import Image
 import requests
 from io import BytesIO
+import sys
+
+# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 # Optional: CLIP for image similarity
 try:
@@ -41,6 +47,11 @@ class MatchResult:
     image_score: float = 0.0
     verdict_reason: str = ""
     needs_review: bool = False
+    # Add these new fields for dashboard compatibility
+    temu_title: str = ""
+    amazon_title: str = ""
+    temu_price: float = 0.0
+    amazon_price: float = 0.0
 
 
 class ProductMatcher:
@@ -172,7 +183,11 @@ class ProductMatcher:
                 match_method="no_match",
                 fuzzy_score=0.0,
                 verdict_reason="No fuzzy matches found",
-                needs_review=True
+                needs_review=True,
+                temu_title=temu_product['title'],
+                amazon_title=amazon_products[0]['title'],
+                temu_price=float(temu_product.get('price', 0)),
+                amazon_price=float(amazon_products[0].get('price', 0))
             )
 
         # Get best match info
@@ -186,7 +201,11 @@ class ProductMatcher:
                 confidence=best_fuzzy_score / 100,
                 match_method="fuzzy_immediate",
                 fuzzy_score=best_fuzzy_score,
-                verdict_reason=f"Very high fuzzy match score ({best_fuzzy_score}%)"
+                verdict_reason=f"Very high fuzzy match score ({best_fuzzy_score}%)",
+                temu_title=temu_product['title'],
+                amazon_title=amazon_products[best_fuzzy_idx]['title'],
+                temu_price=float(temu_product.get('price', 0)),
+                amazon_price=float(amazon_products[best_fuzzy_idx].get('price', 0))
             )
 
         # Always try embedding comparison for top candidates
@@ -253,7 +272,11 @@ class ProductMatcher:
                     embedding_score=embedding_score,
                     image_score=image_score,
                     verdict_reason=verdict,
-                    needs_review=needs_review
+                    needs_review=needs_review,
+                    temu_title=temu_product['title'],
+                    amazon_title=amazon_product['title'],
+                    temu_price=float(temu_product.get('price', 0)),
+                    amazon_price=float(amazon_product.get('price', 0))
                 )
 
         # Always return the best match we found
@@ -264,12 +287,16 @@ class ProductMatcher:
             return MatchResult(
                 temu_id=temu_id,
                 amazon_id=amazon_products[best_fuzzy_idx]['amazon_id'],
-                confidence=best_fuzzy_score / 100 * 0.3,  # Very low confidence
+                confidence=best_fuzzy_score / 100 * 0.3,
                 match_method="fuzzy_only",
                 fuzzy_score=best_fuzzy_score,
                 embedding_score=0.0,
                 verdict_reason=f"Low fuzzy match ({best_fuzzy_score:.1f}%), needs manual review",
-                needs_review=True
+                needs_review=True,
+                temu_title=temu_product['title'],
+                amazon_title=amazon_products[best_fuzzy_idx]['title'],
+                temu_price=float(temu_product.get('price', 0)),
+                amazon_price=float(amazon_products[best_fuzzy_idx].get('price', 0))
             )
 
     def match_all_products(self, temu_file: str, amazon_file: str,
@@ -358,6 +385,12 @@ class ProductMatcher:
                 "temu_id": result.temu_id,
                 "amazon_id": result.amazon_id,
                 "confidence": round(result.confidence, 3),
+                # Add the missing fields here
+                "temu_title": result.temu_title,
+                "amazon_title": result.amazon_title,
+                "temu_price": result.temu_price,
+                "amazon_price": result.amazon_price,
+                # Existing fields
                 "match_method": result.match_method,
                 "scores": {
                     "fuzzy": round(result.fuzzy_score, 1),
