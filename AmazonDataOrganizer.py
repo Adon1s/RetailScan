@@ -6,6 +6,12 @@ import csv
 import json
 from pathlib import Path
 from datetime import datetime
+import sys
+
+# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 # ── CONFIG ──────────────────────────────────────────────────────────────
 CSV_FILE     = Path("amazon_baby_toys.csv")
@@ -53,10 +59,10 @@ def load_and_analyze_products():
 
     with CSV_FILE.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-
-            prod_id = row[ID_FIELD]
-            title   = row["title"]
-            price   = float(row["price"]) if row["price"] else 0.0
+            # accept either old (“amazon_id”) or new (“product_id”) column
+            prod_id = row.get("amazon_id") or row.get("product_id")
+            title = row["title"]
+            price = float(row["price"]) if row.get("price") else 0.0
 
             img_exists = (IMAGES_DIR / f"{prod_id}.jpg").exists()
             title_info = analyze_title_for_keywords(title)
@@ -153,11 +159,11 @@ def main():
 
     print("Loading & analyzing products …")
     products = load_and_analyze_products()
-    print(f"✓ Analyzed {len(products)} products")
+    print(f" Analyzed {len(products)} products")
 
     print("\nCreating LLM analysis file …")
     analysis = create_llm_analysis_file(products)
-    print(f"\n✓ Analysis file saved → {OUTPUT_FILE}")
+    print(f"\n Analysis file saved → {OUTPUT_FILE}")
 
     # mini-summary
     meta = analysis["metadata"]
