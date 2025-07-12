@@ -13,7 +13,7 @@ from typing import Dict, List
 import requests
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
-
+# ------------------------------------------^  alias chosen here
 # ── Config ────────────────────────────────────────────────────────────────────
 SEARCH_URL = "https://www.amazon.com/s?k=baby+toys&ref=nb_sb_noss"
 BASE_URL = "https://www.amazon.com"
@@ -38,15 +38,25 @@ FIELDNAMES = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def load_existing_ids(csv_file: Path) -> set:
+    existing_ids = set()
+    if csv_file.exists():
+        with csv_file.open("r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                existing_ids.add(row["product_id"])
+    return existing_ids
+
 def save_to_csv(rows: List[Dict], csv_file: Path):
-    """Write rows using the canonical FIELDNAMES order and formatting."""
     if not rows:
-        print("No products to save")
+        print("No new products to save")
         return
 
-    with csv_file.open("w", newline="", encoding="utf-8") as f:
+    file_exists = csv_file.exists()
+    with csv_file.open("a" if file_exists else "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
+        if not file_exists:
+            writer.writeheader()
         for r in rows:
             writer.writerow({
                 "product_id": r["product_id"],
@@ -57,10 +67,7 @@ def save_to_csv(rows: List[Dict], csv_file: Path):
                 "product_url": r["product_url"],
             })
 
-    # quick sanity check
-    with csv_file.open("r", encoding="utf-8") as f:
-        assert f.readline().strip() == ",".join(FIELDNAMES), "CSV header mismatch"
-    print(f"📄 CSV saved → {csv_file}")
+    print(f"📄 CSV updated → {csv_file} (added {len(rows)} new products)")
 
 
 def dl_image(row: Dict, dest: Path) -> None:
@@ -197,6 +204,8 @@ async def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     print("Amazon scraper starting…\n" + "=" * 60)
 
+    max_pages = int(input("Enter the number of pages to scrape (default 3): ") or 3)
+
     async with async_playwright() as pw:
         context = await pw.chromium.launch_persistent_context(
             PROFILE_DIR,
@@ -224,7 +233,7 @@ async def main():
         await asyncio.sleep(3)
         await smooth_scroll(page)
 
-        all_products, page_num, max_pages = [], 1, 3
+        all_products, page_num = [], 1
         while True:
             print(f"Extracting page {page_num}…")
             all_products += await extract(page)
@@ -238,22 +247,28 @@ async def main():
             await asyncio.sleep(random.uniform(2, 4))
             await smooth_scroll(page)
 
-        # dedupe
+        # dedupe within this run
         unique = {p["product_id"]: p for p in all_products}.values()
-        print(f" Total unique products: {len(unique)}")
+        print(f" Total unique products scraped: {len(unique)}")
 
-        # save CSV
-        save_to_csv(list(unique), CSV_FILE)
+        # Filter for new products only
+        existing_ids = load_existing_ids(CSV_FILE)
+        new_products = [p for p in unique if p["product_id"] not in existing_ids]
 
-        # images
-        print("\n🖼️  Downloading images…")
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        pics = [p for p in unique if p["image_url"]]
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            futures = [pool.submit(dl_image, p, OUT_DIR) for p in pics]
-            for _ in tqdm(as_completed(futures), total=len(futures), unit="img"):
-                pass
-        print(f"✅ Images saved to {OUT_DIR}")
+        if new_products:
+            save_to_csv(new_products, CSV_FILE)
+
+            # images
+            print("\n🖼️  Downloading images…")
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            pics = [p for p in new_products if p["image_url"]]
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                futures = [pool.submit(dl_image, p, OUT_DIR) for p in pics]
+                for _ in tqdm(as_completed(futures), total=len(futures), unit="img"):
+                    pass
+            print(f"✅ Images saved to {OUT_DIR}")
+        else:
+            print("No new products extracted.")
 
         print("\nDone — close the browser to finish.")
         await context.close()
