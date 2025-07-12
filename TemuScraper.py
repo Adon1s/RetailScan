@@ -384,7 +384,7 @@ async def main():
             PROFILE_DIR,
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],
-            viewport={"width": 1280, "height": 2000},
+            viewport={"width": 1366, "height": 768},
             user_agent=UA_STRING,
             locale="en-US",
         )
