@@ -1,6 +1,7 @@
 """
 Amazon scraper — Playwright stealth + persistent profile
-Based on the Temu scraper structure, adapted for Amazon
+Outputs unified CSV schema that matches the (patched) Temu scraper.
+Schema: product_id,source,title,price,image_url,product_url
 """
 import asyncio
 import csv
@@ -8,6 +9,7 @@ import random
 import re
 from pathlib import Path
 from typing import Dict, List
+
 import requests
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
@@ -24,11 +26,46 @@ UA_STRING = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 
+# Unified CSV header shared with Temu scraper
+FIELDNAMES = [
+    "product_id",  # ASIN for Amazon, numeric id for Temu
+    "source",      # "amazon" / "temu"
+    "title",
+    "price",       # always two‑decimal string
+    "image_url",
+    "product_url",
+]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def save_to_csv(rows: List[Dict], csv_file: Path):
+    """Write rows using the canonical FIELDNAMES order and formatting."""
+    if not rows:
+        print("No products to save")
+        return
+
+    with csv_file.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({
+                "product_id": r["product_id"],
+                "source":     r["source"],
+                "title":      r["title"].strip()[:200],
+                "price":      f"{float(r['price']):.2f}",
+                "image_url":  r.get("image_url", ""),
+                "product_url": r["product_url"],
+            })
+
+    # quick sanity check
+    with csv_file.open("r", encoding="utf-8") as f:
+        assert f.readline().strip() == ",".join(FIELDNAMES), "CSV header mismatch"
+    print(f"📄 CSV saved → {csv_file}")
+
+
 def dl_image(row: Dict, dest: Path) -> None:
     dest.mkdir(exist_ok=True)
-    file_path = dest / f"{row['amazon_id']}.jpg"
+    file_path = dest / f"{row['product_id']}.jpg"
 
     if file_path.exists() or not row["image_url"]:
         return
@@ -45,241 +82,120 @@ def dl_image(row: Dict, dest: Path) -> None:
         r.raise_for_status()
         file_path.write_bytes(r.content)
     except Exception as exc:
-        print(f"✗ {row['amazon_id']} {exc}")
+        print(f"✗ {row['product_id']} {exc}")
 
 
 async def smooth_scroll(page, rounds: int = 15):
-    """Smooth scrolling to load all products"""
     last_height = await page.evaluate("document.body.scrollHeight")
-
     for i in range(rounds):
         await page.mouse.wheel(0, 900)
         await asyncio.sleep(random.uniform(1.5, 2.5))
-
         new_height = await page.evaluate("document.body.scrollHeight")
         if new_height == last_height:
-            # Try once more with a different scroll
             await page.evaluate("window.scrollBy(0, -500)")
             await asyncio.sleep(0.5)
             await page.mouse.wheel(0, 1000)
             await asyncio.sleep(1)
-
             final_height = await page.evaluate("document.body.scrollHeight")
             if final_height == new_height:
                 break
-
         last_height = new_height
-
-        # Print progress
         if (i + 1) % 5 == 0:
-            print(f"  Scrolled {i + 1} times...")
+            print(f"  Scrolled {i + 1} times…")
 
 
 async def wait_for_images(page):
-    """Wait for images to load"""
-    print("Waiting for images to load...")
-
-    # Wait for Amazon product images
+    print("Waiting for images to load…")
     await page.wait_for_function(
         """
         () => {
-            const images = document.querySelectorAll('img');
-            const loadedImages = Array.from(images).filter(img => 
-                img.src && 
-                img.src.startsWith('http') && 
-                (img.src.includes('images-na.ssl-images-amazon.com') || 
-                 img.src.includes('m.media-amazon.com'))
-            );
-            return loadedImages.length > 5;
+            const imgs = [...document.querySelectorAll('img')];
+            return imgs.filter(img => img.src && /amazon\.com/.test(img.src)).length > 5;
         }
         """,
-        timeout=30000
+        timeout=30_000,
     )
-
-    # Additional wait to ensure images are fully loaded
     await asyncio.sleep(2)
 
 
-async def extract_asin(url: str) -> str:
-    """Extract ASIN from Amazon product URL"""
-    # Pattern 1: /dp/ASIN
-    m = re.search(r"/dp/([A-Z0-9]{10})", url)
-    if m:
-        return m.group(1)
-
-    # Pattern 2: /gp/product/ASIN
-    m = re.search(r"/gp/product/([A-Z0-9]{10})", url)
-    if m:
-        return m.group(1)
-
-    # Pattern 3: ASIN in query params
-    m = re.search(r"[?&]ASIN=([A-Z0-9]{10})", url)
-    if m:
-        return m.group(1)
-
+def extract_asin(url: str) -> str:
+    for pat in (r"/dp/([A-Z0-9]{10})", r"/gp/product/([A-Z0-9]{10})", r"[?&]ASIN=([A-Z0-9]{10})"):
+        m = re.search(pat, url)
+        if m:
+            return m.group(1)
     return ""
 
 
 async def extract(page) -> List[Dict]:
-    """Extract product information from Amazon search results"""
-    # First wait for images to load
     await wait_for_images(page)
+    products, seen = [], set()
+    containers = await page.query_selector_all('[data-component-type="s-search-result"], [data-asin]:not([data-asin=""])')
+    print(f"Found {len(containers)} potential containers")
 
-    # Get all product containers
-    products = []
-    seen = set()
-
-    # Amazon uses data-component-type="s-search-result" for products
-    product_containers = await page.query_selector_all(
-        '[data-component-type="s-search-result"], [data-asin]:not([data-asin=""])'
-    )
-
-    print(f"Found {len(product_containers)} potential product containers")
-
-    for container in product_containers:
+    for c in containers:
         try:
-            # Get ASIN directly from data attribute
-            asin = await container.get_attribute("data-asin")
+            asin = await c.get_attribute("data-asin") or ""
             if not asin or asin in seen:
                 continue
-
             seen.add(asin)
-
-            # Find the main product link
-            link = await container.query_selector("h2 a, .s-link, a[href*='/dp/']")
+            link = await c.query_selector("h2 a, a[href*='/dp/']")
             if not link:
                 continue
-
-            href = await link.get_attribute("href")
-            if not href:
-                continue
-
-            # Check if the URL is a tracking URL and clean it up
+            href = await link.get_attribute("href") or ""
             if "aax-us-iad.amazon.com" in href:
-                # Extract the ASIN from the URL
-                asin = await extract_asin(href)
-                if asin:
-                    href = f"{BASE_URL}/dp/{asin}"
-
-            # Now href should be the clean product URL
+                asin = extract_asin(href) or asin
+                href = f"{BASE_URL}/dp/{asin}"
             full_url = href if href.startswith("http") else BASE_URL + href
+            title_el = await c.query_selector("h2 span, h2 a span")
+            title = (await title_el.inner_text()) if title_el else (await link.inner_text())
+            title = (title or "").strip()
 
-            # Get title
-            title_text = ""
-            title_el = await container.query_selector("h2 span, h2 a span, .s-size-mini-space-unit span")
-            if title_el:
-                title_text = (await title_el.inner_text() or "").strip()
-
-            if not title_text:
-                title_text = (await link.inner_text() or "").strip()
-
-            # Find image with multiple strategies
+            # image
             img_url = ""
-
-            # Strategy 1: Direct img tag with class s-image
-            img_el = await container.query_selector("img.s-image")
-            if img_el:
-                img_url = await img_el.get_attribute("src")
-
-            # Strategy 2: Any img tag with Amazon CDN
-            if not img_url:
-                img_el = await container.query_selector(
-                    "img[src*='images-na.ssl-images-amazon.com'], img[src*='m.media-amazon.com']")
-                if img_el:
-                    img_url = await img_el.get_attribute("src")
-
-            # Strategy 3: Check data-lazy-src for lazy loading
-            if not img_url:
-                img_el = await container.query_selector("img[data-lazy-src]")
-                if img_el:
-                    img_url = await img_el.get_attribute("data-lazy-src")
-
-            # Strategy 4: Get any image in the container
-            if not img_url:
-                all_imgs = await container.query_selector_all("img")
-                for img in all_imgs:
-                    src = await img.get_attribute("src")
-                    if src and src.startswith("http") and "transparent-pixel" not in src:
-                        img_url = src
+            for sel in ["img.s-image", "img[src*='m.media-amazon.com']", "img[data-lazy-src]"]:
+                img = await c.query_selector(sel)
+                if img:
+                    img_url = await img.get_attribute("src") or await img.get_attribute("data-lazy-src") or ""
+                    if img_url:
                         break
 
-            # ── Price ────────────────────────────────────────────────
+            # price
             price = 0.0
-
-            # 1. Look for the accessible price span that always contains the full value
-            price_span = await container.query_selector("span.a-offscreen")
-            if price_span:
-                price_text = (await price_span.inner_text() or "").strip()
-
-                # Example formats: "$9.99", "$17.99 Save 10%", "$6.99 - $12.99"
-                m = re.search(r"\$?\s*([\d]+(?:[\d,]*)(?:\.\d+)?)", price_text)
+            span = await c.query_selector("span.a-offscreen")
+            if span:
+                m = re.search(r"[\d,.]+", (await span.inner_text()))
                 if m:
-                    price = float(m.group(1).replace(",", ""))
+                    price = float(m.group().replace(",", ""))
 
-            # 2. Fallbacks – keep your old selectors just in case
-            if price == 0.0:
-                fallback_selectors = [
-                    "span.a-price-whole",
-                    "[data-a-color='base'] span.a-offscreen",
-                    ".a-price-range span.a-offscreen",
-                ]
-                for sel in fallback_selectors:
-                    el = await container.query_selector(sel)
-                    if not el:
-                        continue
-                    txt = (await el.inner_text() or "").strip()
-                    m = re.search(r"\$?\s*([\d]+(?:[\d,]*)(?:\.\d+)?)", txt)
-                    if m:
-                        price = float(m.group(1).replace(",", ""))
-                        break
-
-            # 3. Last-ditch: search the container’s HTML
-            if price == 0.0:
-                html_snippet = await container.inner_html()
-                m = re.search(r"\$([\d]+(?:[\d,]*)(?:\.\d+)?)", html_snippet)
-                if m:
-                    price = float(m.group(1).replace(",", ""))
-
-                    products.append({
-                        "amazon_id": asin,
-                        "title": title_text[:200],
-                        "price": price,  # <-- this is where the value is used
-                        "image_url": img_url,
-                        "product_url": full_url,
-                    })
-        except Exception as e:
+            if not title:
+                continue
+            products.append({
+                "product_id": asin,
+                "source": "amazon",
+                "title": title,
+                "price": price,
+                "image_url": img_url,
+                "product_url": full_url,
+            })
+        except Exception:
             continue
-
     return products
 
 
 async def handle_captcha(page):
-    """Check for and handle CAPTCHA if present"""
     try:
-        # Check for common CAPTCHA indicators
-        captcha_present = await page.query_selector(
-            "form[action*='validateCaptcha'], #captchacharacters, .a-box-inner h4")
-        if captcha_present:
-            print("⚠️  CAPTCHA detected! Please solve it manually in the browser.")
-            print("   Waiting for you to solve the CAPTCHA...")
-
-            # Wait for CAPTCHA to be solved (wait for search results)
-            await page.wait_for_selector(
-                '[data-component-type="s-search-result"]',
-                timeout=300000  # 5 minutes
-            )
-            print("✓ CAPTCHA solved, continuing...")
-            await asyncio.sleep(2)
-    except:
+        cap = await page.query_selector("form[action*='validateCaptcha'], #captchacharacters, .a-box-inner h4")
+        if cap:
+            print("⚠️  CAPTCHA detected — solve manually.")
+            await page.wait_for_selector('[data-component-type="s-search-result"]', timeout=300_000)
+    except Exception:
         pass
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 async def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    print("Amazon Scraper - Starting...")
-    print("=" * 60)
+    print("Amazon scraper starting…\n" + "=" * 60)
 
     async with async_playwright() as pw:
         context = await pw.chromium.launch_persistent_context(
@@ -294,139 +210,52 @@ async def main():
             viewport={"width": 1280, "height": 780},
             user_agent=UA_STRING,
             locale="en-US",
-            permissions=[],
-            geolocation=None,
         )
-
-        # Add stealth scripts
-        await context.add_init_script("""
-            // Override the navigator.webdriver property
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            
-            // Fix chrome object
-            window.chrome = {
-                runtime: {},
-            };
-            
-            // Fix permissions
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Notification.permission }) :
-                    originalQuery(parameters)
-            );
-        """)
-
         page = await context.new_page()
-
-        # Enable image loading
-        await page.route("**/*", lambda route: route.continue_())
-
-        print(f"Navigating to: {SEARCH_URL}")
+        await page.route("**/*", lambda r: r.continue_())
+        print(f"Navigating to {SEARCH_URL}")
         await page.goto(SEARCH_URL, wait_until="domcontentloaded")
-
-        # Handle potential CAPTCHA
         await handle_captcha(page)
-
-        # Wait for initial content
         try:
-            await page.wait_for_selector(
-                '[data-component-type="s-search-result"], [data-asin]',
-                timeout=60000,
-            )
+            await page.wait_for_selector('[data-component-type="s-search-result"]', timeout=60_000)
         except PWTimeout:
-            print("Timeout: products did not load. Amazon might be blocking or showing CAPTCHA.")
-            await context.close()
+            print("Timeout: results didn’t load.")
             return
-
-        # Additional wait for dynamic content
         await asyncio.sleep(3)
-
-        print("Scrolling to load more products...")
         await smooth_scroll(page)
 
-        # Check if there's a "Next" button to load more results
-        all_products = []
-        page_num = 1
-        max_pages = 3  # Limit to prevent too long scraping
-
-        while page_num <= max_pages:
-            print(f"\nExtracting products from page {page_num}...")
-            products = await extract(page)
-            all_products.extend(products)
-            print(f"✓ Found {len(products)} products on page {page_num}")
-
-            next_button = await page.query_selector('a.s-pagination-next')
-            if not next_button or page_num >= max_pages:
-                break  # no more pages or hit max_pages
-
-            print(f"Going to page {page_num + 1}…")
-
-            try:
-                # Many times Amazon triggers a full navigation
-                async with page.expect_navigation(wait_until="domcontentloaded", timeout=60_000):
-                    await next_button.click()
-            except PWTimeout:
-                # If Amazon swapped results via XHR only (no nav event),
-                # just wait until new search-result nodes appear.
-                await page.wait_for_selector(
-                    '[data-component-type="s-search-result"], [data-asin]',
-                    timeout=60_000
-                )
-
+        all_products, page_num, max_pages = [], 1, 3
+        while True:
+            print(f"Extracting page {page_num}…")
+            all_products += await extract(page)
+            next_btn = await page.query_selector('a.s-pagination-next')
+            if not next_btn or page_num >= max_pages:
+                break
+            page_num += 1
+            async with page.expect_navigation(wait_until="domcontentloaded", timeout=60_000):
+                await next_btn.click()
             await handle_captcha(page)
             await asyncio.sleep(random.uniform(2, 4))
             await smooth_scroll(page)
 
-        # Remove duplicates
-        unique_products = []
-        seen_ids = set()
-        for p in all_products:
-            if p['amazon_id'] not in seen_ids:
-                seen_ids.add(p['amazon_id'])
-                unique_products.append(p)
+        # dedupe
+        unique = {p["product_id"]: p for p in all_products}.values()
+        print(f" Total unique products: {len(unique)}")
 
-        print(f"\n✓ Total scraped: {len(unique_products)} unique products")
+        # save CSV
+        save_to_csv(list(unique), CSV_FILE)
 
-        # Debug: Print first few products
-        if unique_products:
-            print("\nSample products:")
-            for p in unique_products[:3]:
-                print(f"  ASIN: {p['amazon_id']}")
-                print(f"  Title: {p['title'][:50]}...")
-                print(f"  Price: ${p['price']}")
-                print(f"  Image: {p['image_url'][:50]}..." if p['image_url'] else "  Image: No image")
-                print(f"  URL: {p['product_url'][:50]}...")
-                print()
+        # images
+        print("\n🖼️  Downloading images…")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        pics = [p for p in unique if p["image_url"]]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(dl_image, p, OUT_DIR) for p in pics]
+            for _ in tqdm(as_completed(futures), total=len(futures), unit="img"):
+                pass
+        print(f"✅ Images saved to {OUT_DIR}")
 
-        if unique_products:
-            # Save to CSV
-            with CSV_FILE.open("w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=unique_products[0].keys())
-                writer.writeheader()
-                writer.writerows(unique_products)
-            print(f"\n📄 CSV saved → {CSV_FILE}")
-
-            # Download images
-            print("\n🖼️  Downloading images...")
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            # Filter products with valid image URLs
-            products_with_images = [p for p in unique_products if p['image_url']]
-            print(f"Found {len(products_with_images)} products with images")
-
-            with ThreadPoolExecutor(max_workers=8) as pool:
-                futures = [pool.submit(dl_image, p, OUT_DIR) for p in products_with_images]
-                for _ in tqdm(as_completed(futures), total=len(futures), unit="img"):
-                    pass
-
-            print(f"✅ Images stored in {OUT_DIR}")
-        else:
-            print("❌ No products extracted — Amazon might be blocking or selectors need update.")
-
-        print("\n🚪 Close the browser window to end session.")
+        print("\nDone — close the browser to finish.")
         await context.close()
 
 

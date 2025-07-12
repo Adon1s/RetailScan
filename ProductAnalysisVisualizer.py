@@ -11,7 +11,7 @@ import tempfile
 import os
 
 
-def load_analysis_results(filepath: Path = Path("viability_screening_results.json")):
+def load_analysis_results(filepath: Path = Path("viability_screening_results_new.json")):
     """Load the analysis results"""
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
