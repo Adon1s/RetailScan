@@ -285,7 +285,7 @@ class PipelineRunner:
         """Show summary of results"""
         try:
             # Try to load enriched results first
-            results_file = "matching_results_enriched.json"
+            results_file = "matching_results_llm.json"
             if not Path(results_file).exists():
                 results_file = "matching_results.json"
 
