@@ -13,6 +13,7 @@ from dataclasses import dataclass, asdict
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
+import re  # Added for potential cleanup if needed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 LM_STUDIO_URL = "http://localhost:1234"  # Update with your LM Studio URL
 DEFAULT_MODEL = None  # Will use whatever model is loaded in LM Studio
 
+
 @dataclass
 class LLMVerdict:
     """Result from LLM analysis of a product pair"""
@@ -29,6 +31,7 @@ class LLMVerdict:
     rationale: str
     image_similarity: float
     processing_time: float
+
 
 class ProductMatchReranker:
     def __init__(self,
@@ -69,9 +72,9 @@ class ProductMatchReranker:
         #     return False
 
     def select_top_candidates(self,
-                            matches: List[Dict],
-                            percentage: float = 0.35,
-                            min_confidence: float = 0.6) -> List[Dict]:
+                              matches: List[Dict],
+                              percentage: float = 0.35,
+                              min_confidence: float = 0.6) -> List[Dict]:
         """
         Select top percentage of matches for LLM re-ranking
 
@@ -98,7 +101,7 @@ class ProductMatchReranker:
                 break  # Since sorted, no point checking further
 
         logger.info(f"Selected {len(candidates)} candidates from {len(matches)} matches "
-                   f"(top {percentage*100}% with confidence >= {min_confidence})")
+                    f"(top {percentage * 100}% with confidence >= {min_confidence})")
 
         return candidates
 
@@ -115,16 +118,14 @@ class ProductMatchReranker:
             logger.error(f"Error loading image {image_path}: {e}")
             return None
 
-    def _prepare_llm_prompt(self, match: Dict, temu_img_b64: str, amazon_img_b64: str) -> Dict:
-        """Prepare the prompt for LLM analysis"""
-        # Extract price difference info
+    def _create_prompt(self, match: Dict) -> str:
+        """Create the LLM prompt string (extracted to avoid duplication)."""
         temu_price = match.get('temu_price', 0)
         amazon_price = match.get('amazon_price', 0)
         price_diff = abs(amazon_price - temu_price)
         price_diff_pct = (price_diff / min(temu_price, amazon_price) * 100) if min(temu_price, amazon_price) > 0 else 0
 
-        # Build the prompt
-        prompt_text = f"""You are a product-matching assistant. Analyze these two products and determine if they represent the SAME physical product (not just similar category).
+        return f"""You are a product-matching assistant. Analyze these two products and determine if they represent the SAME physical product (not just similar category).
 
 Product 1 (Temu):
 - Title: {match.get('temu_title', 'Unknown')}
@@ -148,6 +149,10 @@ Respond with JSON only:
   "image_similarity": 0.0-1.0,
   "rationale": "Brief explanation"
 }}"""
+
+    def _prepare_llm_prompt(self, match: Dict, temu_img_b64: str, amazon_img_b64: str) -> Dict:
+        """Prepare the prompt for LLM analysis"""
+        prompt_text = self._create_prompt(match)
 
         # Build message content
         content = [{"type": "text", "text": prompt_text}]
@@ -189,35 +194,7 @@ Respond with JSON only:
                 images.append(lms.prepare_image(str(amazon_img_path)))
 
             # Create prompt
-            temu_price = match.get('temu_price', 0)
-            amazon_price = match.get('amazon_price', 0)
-            price_diff = abs(amazon_price - temu_price)
-            price_diff_pct = (price_diff / min(temu_price, amazon_price) * 100) if min(temu_price, amazon_price) > 0 else 0
-
-            prompt = f"""You are a product-matching assistant. Analyze these two products and determine if they represent the SAME physical product (not just similar category).
-
-Product 1 (Temu):
-- Title: {match.get('temu_title', 'Unknown')}
-- Price: ${temu_price:.2f}
-
-Product 2 (Amazon):
-- Title: {match.get('amazon_title', 'Unknown')}
-- Price: ${amazon_price:.2f}
-
-Price difference: ${price_diff:.2f} ({price_diff_pct:.1f}%)
-
-Consider:
-1. Visual appearance (shape, color, design, components)
-2. Product features and accessories
-3. Brand/manufacturer (if visible)
-4. Whether price difference is reasonable for same product
-
-Respond with JSON only:
-{{
-  "same_product": true/false,
-  "image_similarity": 0.0-1.0,
-  "rationale": "Brief explanation"
-}}"""
+            prompt = self._create_prompt(match)
 
             chat = lms.Chat()
             chat.add_user_message(prompt, images=images)
@@ -230,7 +207,6 @@ Respond with JSON only:
             response_text = str(response)
 
             # Parse JSON from response text
-            import re
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
@@ -272,7 +248,6 @@ Respond with JSON only:
 
             # Parse JSON from response
             # Try to extract JSON if wrapped in text
-            import re
             json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
@@ -317,10 +292,10 @@ Respond with JSON only:
         return match, verdict
 
     def run_llm_batch(self,
-                     candidates: List[Dict],
-                     batch_size: int = 5,
-                     max_workers: int = 3,
-                     checkpoint_callback=None) -> List[Tuple[Dict, Optional[LLMVerdict]]]:
+                      candidates: List[Dict],
+                      batch_size: int = 5,
+                      max_workers: int = 3,
+                      checkpoint_callback=None) -> List[Tuple[Dict, Optional[LLMVerdict]]]:
         """
         Process candidates in batches with LLM
 
@@ -338,11 +313,9 @@ Respond with JSON only:
         processed_count = 0
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit batches
-            future_to_match = {}
-
             for i in range(0, total, batch_size):
-                batch = candidates[i:i+batch_size]
+                future_to_match = {}  # Reset for each batch
+                batch = candidates[i:i + batch_size]
                 for match in batch:
                     future = executor.submit(self.analyze_single_match, match)
                     future_to_match[future] = match
@@ -355,11 +328,11 @@ Respond with JSON only:
 
                     if verdict:
                         logger.info(f"Processed {match['temu_id']}-{match['amazon_id']}: "
-                                   f"same_product={verdict.same_product} "
-                                   f"[{processed_count}/{total}]")
+                                    f"same_product={verdict.same_product} "
+                                    f"[{processed_count}/{total}]")
                     else:
                         logger.warning(f"Failed to process {match['temu_id']}-{match['amazon_id']} "
-                                     f"[{processed_count}/{total}]")
+                                       f"[{processed_count}/{total}]")
 
                     # Call checkpoint callback if provided
                     if checkpoint_callback:
@@ -372,8 +345,8 @@ Respond with JSON only:
         return results
 
     def merge_llm_results(self,
-                         original_matches: List[Dict],
-                         llm_results: List[Tuple[Dict, Optional[LLMVerdict]]]) -> List[Dict]:
+                          original_matches: List[Dict],
+                          llm_results: List[Tuple[Dict, Optional[LLMVerdict]]]) -> List[Dict]:
         """Merge LLM verdicts back into matches"""
         # Create lookup for LLM results
         llm_lookup = {}
@@ -401,6 +374,43 @@ Respond with JSON only:
 
         return enhanced_matches
 
+
+def load_existing_enriched(output_file: Path) -> Tuple[List[Dict], Dict[str, Dict]]:
+    """Load existing enriched matches and create a lookup dict."""
+    if not output_file.exists():
+        return [], {}
+
+    with open(output_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    existing_matches = data.get('matches', [])
+    existing_lookup = {f"{m['temu_id']}_{m['amazon_id']}": m for m in existing_matches}
+    logger.info(f"Loaded {len(existing_matches)} existing enriched matches from {output_file}")
+    return existing_matches, existing_lookup
+
+
+def update_existing_match(existing: Dict, current: Dict) -> bool:
+    """Update existing match with current data if changed (e.g., prices). Return True if updated."""
+    updated = False
+    if existing.get('temu_price') != current.get('temu_price'):
+        old_temu = existing.get('temu_price')
+        new_temu = current.get('temu_price')
+        existing['temu_price'] = new_temu
+        updated = True
+        logger.info(f"Price updated for {existing['temu_id']}-{existing['amazon_id']}: temu {old_temu}→{new_temu}")
+
+    if existing.get('amazon_price') != current.get('amazon_price'):
+        old_amazon = existing.get('amazon_price')
+        new_amazon = current.get('amazon_price')
+        existing['amazon_price'] = new_amazon
+        updated = True
+        logger.info(
+            f"Price updated for {existing['temu_id']}-{existing['amazon_id']}: amazon {old_amazon}→{new_amazon}")
+
+    # You can add more fields to check/update here (e.g., titles, urls)
+
+    return updated
+
+
 def main(input_file: str = "matching_results.json",
          output_file: str = "matching_results_enriched.json",
          percentage: float = 0.35,
@@ -424,18 +434,22 @@ def main(input_file: str = "matching_results.json",
     """
     logger.info("=== Product Match LLM Re-ranking ===")
 
-    # Load matches
+    # Load matches from input
     logger.info(f"Loading matches from {input_file}")
     with open(input_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    matches = data.get('matches', [])
+    current_matches = data.get('matches', [])
     metadata = data.get('metadata', {})
 
-    # Check for existing checkpoint
-    checkpoint_file = Path(output_file).with_suffix('.checkpoint.json')
+    # Load existing enriched if present
+    output_path = Path(output_file)
+    existing_matches, existing_lookup = load_existing_enriched(output_path)
+
+    # Check for checkpoint (intra-run progress)
+    checkpoint_file = output_path.with_suffix('.checkpoint.json')
     existing_results = []
-    processed_keys = set()
+    processed_keys = set(existing_lookup.keys())  # Start with keys from existing output
 
     if checkpoint_file.exists():
         logger.info(f"Found checkpoint file: {checkpoint_file}")
@@ -454,7 +468,7 @@ def main(input_file: str = "matching_results.json",
                     key = f"{match['temu_id']}_{match['amazon_id']}"
                     processed_keys.add(key)
 
-                logger.info(f"Loaded {len(existing_results)} previously processed results")
+                logger.info(f"Loaded {len(existing_results)} checkpoint results")
         except Exception as e:
             logger.error(f"Error loading checkpoint: {e}")
 
@@ -464,25 +478,24 @@ def main(input_file: str = "matching_results.json",
         model_name=model_name
     )
 
-    # Select candidates
+    # Select candidates from current input
     all_candidates = reranker.select_top_candidates(
-        matches,
+        current_matches,
         percentage=percentage,
         min_confidence=min_confidence
     )
 
-    # Filter out already processed candidates
+    # Filter to new/unprocessed candidates
     candidates = []
     for candidate in all_candidates:
         key = f"{candidate['temu_id']}_{candidate['amazon_id']}"
         if key not in processed_keys:
             candidates.append(candidate)
 
-    logger.info(f"Found {len(candidates)} new candidates to process (skipping {len(all_candidates) - len(candidates)} already processed)")
+    logger.info(
+        f"Found {len(candidates)} new/unprocessed candidates to process (skipping {len(all_candidates) - len(candidates)} already processed)")
 
-    if not candidates:
-        logger.info("No new candidates to process")
-    else:
+    if candidates:
         # Define checkpoint callback
         all_results = existing_results.copy()
         results_since_checkpoint = 0
@@ -499,7 +512,6 @@ def main(input_file: str = "matching_results.json",
                 serializable_results = []
                 for match, verdict in all_results:
                     if verdict:
-                        # Convert dataclass to dict
                         verdict_dict = asdict(verdict)
                     else:
                         verdict_dict = None
@@ -528,16 +540,57 @@ def main(input_file: str = "matching_results.json",
 
         # Combine all results
         all_results = existing_results + new_results
+    else:
+        all_results = []  # No new LLM processing needed
 
-    # Merge results
-    enhanced_matches = reranker.merge_llm_results(matches, all_results)
+    # Now merge/update with current input
+    # Create/update lookup from current matches
+    current_lookup = {f"{m['temu_id']}_{m['amazon_id']}": m for m in current_matches}
+
+    # Final matches start from existing
+    final_matches = []
+    updated_count = 0
+
+    # Update existing or add from current
+    for key, existing_match in existing_lookup.items():
+        if key in current_lookup:
+            current_match = current_lookup[key]
+            if update_existing_match(existing_match, current_match):
+                updated_count += 1
+            final_matches.append(existing_match)
+            del current_lookup[key]  # Remove processed
+
+    # Add new from current (that weren't in existing)
+    for key, current_match in current_lookup.items():
+        # Check if it has LLM result from all_results (if it was processed this run)
+        llm_verdict = next((v for m, v in all_results if f"{m['temu_id']}_{m['amazon_id']}" == key), None)
+        enhanced_match = current_match.copy()
+        if llm_verdict:
+            enhanced_match['llm_same_product'] = llm_verdict.same_product
+            enhanced_match['llm_rationale'] = llm_verdict.rationale
+            enhanced_match['llm_image_similarity'] = llm_verdict.image_similarity
+            enhanced_match['llm_processing_time'] = llm_verdict.processing_time
+            enhanced_match['llm_processed'] = True
+        else:
+            enhanced_match['llm_processed'] = False
+        final_matches.append(enhanced_match)
+        logger.info(f"Added new match: {key}")
+
+    # Sort final by confidence descending
+    final_matches.sort(key=lambda x: x['confidence'], reverse=True)
+
+    if updated_count > 0:
+        logger.info(f"Updated {updated_count} existing matches (e.g., prices)")
 
     # Calculate statistics
     llm_stats = {
-        'total_processed': sum(1 for m in enhanced_matches if m.get('llm_processed', False)),
-        'llm_same': sum(1 for m in enhanced_matches if m.get('llm_same_product', False)),
-        'llm_different': sum(1 for m in enhanced_matches if m.get('llm_processed', False) and not m.get('llm_same_product', True)),
-        'average_processing_time': sum(m.get('llm_processing_time', 0) for m in enhanced_matches if m.get('llm_processed', False)) / max(1, sum(1 for m in enhanced_matches if m.get('llm_processed', False)))
+        'total_processed': sum(1 for m in final_matches if m.get('llm_processed', False)),
+        'llm_same': sum(1 for m in final_matches if m.get('llm_same_product', False)),
+        'llm_different': sum(
+            1 for m in final_matches if m.get('llm_processed', False) and not m.get('llm_same_product', True)),
+        'average_processing_time': sum(
+            m.get('llm_processing_time', 0) for m in final_matches if m.get('llm_processed', False)) / max(1, sum(
+            1 for m in final_matches if m.get('llm_processed', False)))
     }
 
     # Update metadata
@@ -554,7 +607,7 @@ def main(input_file: str = "matching_results.json",
     # Save final results
     output_data = {
         'metadata': metadata,
-        'matches': enhanced_matches
+        'matches': final_matches
     }
 
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -570,6 +623,7 @@ def main(input_file: str = "matching_results.json",
     logger.info(f"Same product: {llm_stats['llm_same']}")
     logger.info(f"Different product: {llm_stats['llm_different']}")
     logger.info(f"Average processing time: {llm_stats['average_processing_time']:.2f}s per match")
+
 
 if __name__ == "__main__":
     fire.Fire(main)
