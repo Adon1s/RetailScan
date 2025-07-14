@@ -12,7 +12,6 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-
 # Configuration
 CSV_FILE = Path("temu_baby_toys.csv")
 IMAGES_DIR = Path("temu_baby_toys_imgs")
@@ -218,4 +217,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main
+    main()
