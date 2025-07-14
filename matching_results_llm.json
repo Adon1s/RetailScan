@@ -1,0 +1,1575 @@
+{
+  "metadata": {
+    "timestamp": "2025-07-12T16:46:41.179572",
+    "total_matches": 80,
+    "high_confidence": 4,
+    "medium_confidence": 51,
+    "low_confidence": 25,
+    "needs_review": 59,
+    "use_images": true,
+    "llm_enrichment": {
+      "timestamp": "2025-07-12T16:50:27",
+      "candidates_selected": 28,
+      "percentage_used": 0.35,
+      "min_confidence_used": 0.6,
+      "total_processed": 28,
+      "llm_same": 2,
+      "llm_different": 26,
+      "average_processing_time": 19.128484061786107
+    }
+  },
+  "matches": [
+    {
+      "temu_id": "601100303123942",
+      "amazon_id": "B0BTBV51KY",
+      "confidence": 0.988,
+      "temu_title": "4pcs Press To Go Car Toys For Toddlers 1-3, Baby Animal Racing Cars, Infant Play Vehicle Set, Baby Push Go Friction Car Toys For 6-9-12-18 Months, 1st Birthday Gifts For 1-2 Years Old Boys",
+      "amazon_title": "iPlay, iLearn Press to Go Car Toys for Toddlers 1-3, Baby Animal Racing Cars, Infant Play Vehicle Set, Baby Push Go Friction Car Toys for 6-9-12-18 Months, 1st Birthday Gifts for 1-2 Years Old Boys",
+      "temu_price": 10.42,
+      "amazon_price": 17.99,
+      "match_method": "fuzzy_immediate",
+      "scores": {
+        "fuzzy": 98.8,
+        "embedding": 0.0,
+        "image": null
+      },
+      "verdict": "Very high fuzzy match score (98.80239520958084%)",
+      "needs_review": false,
+      "llm_same_product": true,
+      "llm_rationale": "The images show identical car toys with animal heads on top. The titles are nearly the same, describing the same features (press to go, friction powered, animal racing cars). The brand 'iPlay, iLearn' is present in the Amazon listing and likely the manufacturer of the Temu product as well. While there\u2019s a significant price difference, this is common between platforms like Temu and Amazon.",
+      "llm_image_similarity": 0.95,
+      "llm_processing_time": 27.81303381919861,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100274781928",
+      "amazon_id": "B0DGXCDWX6",
+      "confidence": 0.978,
+      "temu_title": "FDIT Baby Play Gym & Activity Mat, 5 Developmental Zones Tummy Time Mat With 6 Detachable Sensory Toys For Motor Skills & Sensory Development",
+      "amazon_title": "Blissful Diary Baby Play Gym & Activity Mat, 5 Developmental Zones Wooden Tummy Time Mat with 6 Detachable Sensory Toys for Motor Skills & Sensory Development, Baby Essentials Shower Gift",
+      "temu_price": 19.88,
+      "amazon_price": 89.99,
+      "match_method": "fuzzy_immediate",
+      "scores": {
+        "fuzzy": 97.8,
+        "embedding": 0.0,
+        "image": null
+      },
+      "verdict": "Very high fuzzy match score (97.77777777777777%)",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both products are baby play gyms with similar features (activity mat, detachable toys), the visual appearance is significantly different. The Temu product has a plastic arch and a patterned mat with animal designs, while the Amazon product features a wooden arch and a different color scheme/pattern on the mat. The price difference of over 350% also suggests they are not the same item.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 18.9594407081604,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101807537283",
+      "amazon_id": "B09B2BM8F7",
+      "confidence": 0.921,
+      "temu_title": "Baby & Toddler Farm Toys for 12-18 Months, Activity Table for 1+ Years Old Boys Girls, Toddler Infant Sensory Toys Kids Birthday Gifts, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "amazon_title": "Baby & Toddler Toys, Baby Activity Center 6 to 12-18 Month Old, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "temu_price": 20.79,
+      "amazon_price": 26.99,
+      "match_method": "fuzzy_immediate",
+      "scores": {
+        "fuzzy": 92.1,
+        "embedding": 0.0,
+        "image": null
+      },
+      "verdict": "Very high fuzzy match score (92.06349206349206%)",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The images show distinctly different activity tables. The Temu product features a farm-themed design with animals and produce, while the Amazon product has a more general musical/learning theme with lights and piano keys. While both are activity tables for toddlers, their visual appearance and components are significantly different.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 10.475290060043335,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099572347191",
+      "amazon_id": "B08SGH7NKX",
+      "confidence": 0.805,
+      "temu_title": "Baby Balance Bike Toys for 1 Year Old Boys Girls, 10-36 Months Toddler Bike, Non-Pedal 4 Silent Wheels Riding Toys Indoor Outdoor, First Birthday Gifts, Kids Pre-School First Bike Dinosaur",
+      "amazon_title": "SEREED Baby Balance Bike for 1 Year Old Boys Girls 12-24 Month Toddler Balance Bike, 4 Wheels Toddler First Bike, First Birthday Gifts",
+      "temu_price": 22.8,
+      "amazon_price": 34.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 89.0,
+        "embedding": 0.858,
+        "image": 0.707
+      },
+      "verdict": "Good text match, moderate image: fuzzy=89.0%, embedding=0.86, image=0.71",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are both baby balance bikes but have significantly different designs and aesthetics. The Temu product is dinosaur-themed with a green color scheme, while the Amazon product has a minimalist design in pastel colors. They also differ in shape and overall construction.",
+      "llm_image_similarity": 0.2,
+      "llm_processing_time": 23.997655153274536,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099689481973",
+      "amazon_id": "B08P5K9Y8Y",
+      "confidence": 0.8,
+      "temu_title": "Early Educational Learning Toys, Baby Musical Ladybug Crawling Bilingual Toys With Light-up Music, Baby Toys For 7 8 9 10 11 Months 1-2 Years Old, Newborn Boys Girls (Red), Infant Gift Toys, First Bir",
+      "amazon_title": "Baby Piano Toy 6 to 12 Months Light Up Music Baby Toys for 0 6 9 12 18 Months Early Learning Educational Piano Keyboard Infant Babies Girl Toy 1 Year Old Boy Girls Gift",
+      "temu_price": 21.48,
+      "amazon_price": 14.44,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 75.8,
+        "embedding": 0.786,
+        "image": 0.837
+      },
+      "verdict": "Good text match, moderate image: fuzzy=75.8%, embedding=0.79, image=0.84",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are different in visual appearance and functionality. Product 1 is a crawling ladybug toy with buttons and lights, while Product 2 is an elephant-shaped piano keyboard. They have distinct designs and features despite both being early educational toys for babies.",
+      "llm_image_similarity": 0.2,
+      "llm_processing_time": 22.37510633468628,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100293325403",
+      "amazon_id": "B0CDB7F7W3",
+      "confidence": 0.799,
+      "temu_title": "1 Year Old Boy Gifts 12-18 Months Musical Toys Cute Bear Tilting Doll Baby Music Stacking Toy, Building Block Early Education Learning Toy With Lights/Musical, Birthday Gift Toys For 1 2 3 Years Old",
+      "amazon_title": "Baby Toys for 1 Year Old: Baby Musical Mat Toddler Toys Age 1-2 - 2 in 1 Piano Drum Babies Play Mat - Infant Music Toy 12-18 Months Babies Birthday Valentines Gifts for 1 2 3 Year Old Boys Girls",
+      "temu_price": 12.41,
+      "amazon_price": 19.54,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 68.2,
+        "embedding": 0.826,
+        "image": 0.848
+      },
+      "verdict": "Good text match, moderate image: fuzzy=68.2%, embedding=0.83, image=0.85",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are different toys. Product 1 is a stacking ring toy with a bear theme, while product 2 is a musical play mat featuring piano and drum functions. They have completely distinct designs and functionalities.",
+      "llm_image_similarity": 0.05,
+      "llm_processing_time": 8.587233781814575,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601102030406931",
+      "amazon_id": "B098NCLFGD",
+      "confidence": 0.791,
+      "temu_title": "8-in-1 Wooden Activity Cube, Bonus Sorting & Stacking Board, Toys for 1+ Year Old Boys & Girls, Educational Learning Toys for Toddlers Age 1-2, 1st Birthday Gift with Word Cards",
+      "amazon_title": "Toddlers Montessori Wooden Educational Toys for Baby Boys Girls Age 1 2 3 Year Old, Shape Sorting Toys 1st One First Birthday Girl Gifts for Kids 1-3, Wood Preschool Learning Fine Motor Skills Game",
+      "temu_price": 14.7,
+      "amazon_price": 22.49,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 73.9,
+        "embedding": 0.8,
+        "image": 0.815
+      },
+      "verdict": "Good text match, moderate image: fuzzy=73.9%, embedding=0.80, image=0.82",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The images show distinctly different activity cubes. The Temu product (first image) is a multi-sided cube with gears, beads, shape sorters and other features. The Amazon product (second image) appears to be a 'harvest' themed cube with removable fruits/vegetables. They are not the same physical product despite both being wooden activity toys for toddlers.",
+      "llm_image_similarity": 0.2,
+      "llm_processing_time": 16.754624366760254,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101268491304",
+      "amazon_id": "B01AC7SF7K",
+      "confidence": 0.776,
+      "temu_title": "SYNCFUN Musical Elephant Plush Toy for Babies 6+ Months - Interactive Baby Stuffed Animal with 12 ABC/123 Songs, Soothing Melodies & Colorful Lights, Soft Safe Plush, Christmas Birthday Gift for Boys",
+      "amazon_title": "Baby GUND Animated Flappy the Elephant Plush, Singing Stuffed Animal Baby Toy for Ages 0 and Up, Gray, 12\"",
+      "temu_price": 9.79,
+      "amazon_price": 38.79,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 65.1,
+        "embedding": 0.787,
+        "image": 0.845
+      },
+      "verdict": "Good text match, moderate image: fuzzy=65.1%, embedding=0.79, image=0.84",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both are gray elephant plush toys with interactive features, they differ in brand (SYNCFUN vs Baby GUND), design details (ear size/shape, button placement, overall aesthetic) and price. The Amazon product is a well-known branded item while the Temu one appears to be a generic version. A 296% price difference isn't reasonable for the same physical product.",
+      "llm_image_similarity": 0.65,
+      "llm_processing_time": 25.381059169769287,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100019196642",
+      "amazon_id": "B0CDB7F7W3",
+      "confidence": 0.771,
+      "temu_title": "VATOS Baby Play Gym, Baby Learning Walker Activity Gym Mat With Play Piano, 4 In 1 Play Mat With Musical Lights Rattle Teething Toys, Best Gift For Baby Toddler Infants 3 6 9 12 Months",
+      "amazon_title": "Baby Toys for 1 Year Old: Baby Musical Mat Toddler Toys Age 1-2 - 2 in 1 Piano Drum Babies Play Mat - Infant Music Toy 12-18 Months Babies Birthday Valentines Gifts for 1 2 3 Year Old Boys Girls",
+      "temu_price": 35.54,
+      "amazon_price": 19.54,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 68.6,
+        "embedding": 0.712,
+        "image": 0.877
+      },
+      "verdict": "Strong match: fuzzy=68.6%, embedding=0.71, image=0.88",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both products are baby musical play mats, the Temu product appears to be a more complex '4-in-1' activity gym with an overhead bar and hanging toys for younger infants (lying/play mat stage). The Amazon product is a simpler piano/drum mat designed for older babies who can sit or stand. The designs and included accessories are different enough to indicate they aren\u2019t the same item, despite sharing some features.",
+      "llm_image_similarity": 0.6,
+      "llm_processing_time": 25.5432448387146,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099871756813",
+      "amazon_id": "B098NCLFGD",
+      "confidence": 0.77,
+      "temu_title": "Wooden Farm Intelligence Car, Preschool Learning Fine Motor Skills Games, Funny Educational Toys For Girls Boys, Christmas Birthday Gifts For Kids",
+      "amazon_title": "Toddlers Montessori Wooden Educational Toys for Baby Boys Girls Age 1 2 3 Year Old, Shape Sorting Toys 1st One First Birthday Girl Gifts for Kids 1-3, Wood Preschool Learning Fine Motor Skills Game",
+      "temu_price": 11.53,
+      "amazon_price": 22.49,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 80.5,
+        "embedding": 0.726,
+        "image": 0.787
+      },
+      "verdict": "Good text match, moderate image: fuzzy=80.5%, embedding=0.73, image=0.79",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both products are wooden educational toys for toddlers focusing on fine motor skills and shape/color recognition, the designs are significantly different. The Amazon product is a cube with animal shapes poking out, while the Temu product features a 'farm' design with removable root vegetables. The components and overall aesthetic differ greatly.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 24.53475856781006,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099951892332",
+      "amazon_id": "B0CY4X37RD",
+      "confidence": 0.757,
+      "temu_title": "12-Inch Pink Reborn Youngsters Doll with Fluffy Bunny Ears - Soft PVC, Realistic Comfort Toy, Perfect Birthday Gift and Playmate for Boys and Girls Over Three Years Old",
+      "amazon_title": "BABESIDE Baby Dolls, 17inch Large Realistic Cute Soft Body Baby Doll Real Life Baby Dolls with Accessories for 3+ Year Old Girls Gifts, Pretend Play, Collection",
+      "temu_price": 8.21,
+      "amazon_price": 23.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 57.9,
+        "embedding": 0.763,
+        "image": 0.863
+      },
+      "verdict": "Strong match: fuzzy=57.9%, embedding=0.76, image=0.86",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both are reborn baby dolls, they differ significantly in size (12 inch vs 17 inch), design/clothing, and overall aesthetic. The Temu doll has bunny ears and a pink outfit while the Amazon doll is wearing a unicorn-themed onesie. The price difference of over 190% is also substantial given that they are not identical.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 10.558791875839233,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100044036458",
+      "amazon_id": "B0CDB7F7W3",
+      "confidence": 0.755,
+      "temu_title": "20-in-1 Youngsters Busy Board Cube Toys, Active Cube Toys for 1 2 Year Old Boys Girls Youngsters, Early Educational Sensory Toy for Youngsters 1-3, Travel Toys Gifts for 1 2 Year Old Boy Girl",
+      "amazon_title": "Baby Toys for 1 Year Old: Baby Musical Mat Toddler Toys Age 1-2 - 2 in 1 Piano Drum Babies Play Mat - Infant Music Toy 12-18 Months Babies Birthday Valentines Gifts for 1 2 3 Year Old Boys Girls",
+      "temu_price": 23.84,
+      "amazon_price": 19.54,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 60.7,
+        "embedding": 0.776,
+        "image": 0.828
+      },
+      "verdict": "Good text match, moderate image: fuzzy=60.7%, embedding=0.78, image=0.83",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are completely different. Product 1 is a busy cube with various interactive elements, while Product 2 is a musical play mat featuring a piano and drum set. They have distinct shapes, features, and functionalities.",
+      "llm_image_similarity": 0.05,
+      "llm_processing_time": 16.70259976387024,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101376828383",
+      "amazon_id": "B0DGXCDWX6",
+      "confidence": 0.752,
+      "temu_title": "Baby Activity Center with Pedal Piano, 5 Sensory Toys, Interactive Lights & Music - Rolling Time Pad & Belly Time Fitness Mat for Motor Skill Development, Easy Assembly, Baby Gym Play Mat, Safe Soft M",
+      "amazon_title": "Blissful Diary Baby Play Gym & Activity Mat, 5 Developmental Zones Wooden Tummy Time Mat with 6 Detachable Sensory Toys for Motor Skills & Sensory Development, Baby Essentials Shower Gift",
+      "temu_price": 15.11,
+      "amazon_price": 89.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 64.4,
+        "embedding": 0.785,
+        "image": 0.792
+      },
+      "verdict": "Good text match, moderate image: fuzzy=64.4%, embedding=0.78, image=0.79",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both products are baby play gyms/activity mats, they differ significantly in design and materials. The Temu product features a brightly colored plastic arch with a built-in piano and more vibrant patterns on the mat. The Amazon product has a wooden arch and a softer, muted color scheme. The detachable toys also appear different. The large price difference is not reasonable for the same item.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 25.1410813331604,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100760009320",
+      "amazon_id": "B0BLMF98S8",
+      "confidence": 0.737,
+      "temu_title": "Youngsters Balance Bike for 1 Year Old Boys Girls, Riding Toys for Youngsters, No Pedal Bicycle, 12-36 Months Youngsters First Bike, Best Gift for Birthday, Christmas, Halloween, Perfect Father's Day",
+      "amazon_title": "Colorful Lighting Baby Balance Bike Toys for 1 Year Old Girl Gifts, 10-36 Month Toddler Balance Bike, No Pedal 4 Silence Wheels & Soft Seat Pre-School First Riding on Toys, 1st Birthday Gifts.",
+      "temu_price": 23.03,
+      "amazon_price": 35.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 70.1,
+        "embedding": 0.845,
+        "image": 0.665
+      },
+      "verdict": "Good text match, moderate image: fuzzy=70.1%, embedding=0.84, image=0.66",
+      "needs_review": true,
+      "llm_same_product": true,
+      "llm_rationale": "Both products are balance bikes for toddlers aged 1-3 years with no pedals and feature glowing wheels. The overall design, including the frame shape, wheel configuration, and seat style, is nearly identical in both images. While colors differ (green/brown vs pink/white), this is a common variation. The significant price difference could be due to retailer markup or sales.",
+      "llm_image_similarity": 0.95,
+      "llm_processing_time": 23.03548550605774,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100941815091",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.726,
+      "temu_title": "Crawling Baby Toys, Infant Tummy Time Toys With Star Projector Music And Light, Elephant Interactive Sensory Toy For Baby, Early Developmental Toys For Boys Girls The Perfect Halloween Gift.",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 13.15,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 61.5,
+        "embedding": 0.754,
+        "image": 0.771
+      },
+      "verdict": "Good text match, moderate image: fuzzy=61.5%, embedding=0.75, image=0.77",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are visually distinct: one is an elephant-shaped toy with a projector and buttons, while the other is a plush octopus. They have different shapes, materials, and features despite both being baby toys that play music.",
+      "llm_image_similarity": 0.1,
+      "llm_processing_time": 23.38318943977356,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099667473558",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.723,
+      "temu_title": "[6+ Months Musical Toy] 6+ Months Crawling Penguin Baby Musical Toys | Tummy Time Toys With Music & Lights, Light Up Learning Toys, Dancing Crawling Baby Toy, Baby Easter Basket Stuffers",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 12.05,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 68.1,
+        "embedding": 0.75,
+        "image": 0.725
+      },
+      "verdict": "Good text match, moderate image: fuzzy=68.1%, embedding=0.75, image=0.72",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are visually distinct: one is a penguin and the other is a bee. While both are musical toys for babies, they have different shapes, designs, and features.",
+      "llm_image_similarity": 0.05,
+      "llm_processing_time": 16.53439474105835,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101186034718",
+      "amazon_id": "B0CR3FQ58C",
+      "confidence": 0.723,
+      "temu_title": "10-Page Blue Busy Board for Toddlers - Travel Toy with Sensory Learning Activities, Interactive Felt Book for Fine Motor Skills & - Airplane/Car Essentials, All Ages Educational Toy, Toddler Toy, Plan",
+      "amazon_title": "hahaland Busy Book for Toddlers 1-3 - Montessori Toys Busy Board for 1 Year Old Boy Gifts Girl Toys Educational Learning Quiet Activity Books Toddler Airplane Travel Toy 1-2 One Year Old Birthday Gift",
+      "temu_price": 10.42,
+      "amazon_price": 27.92,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 67.4,
+        "embedding": 0.758,
+        "image": 0.723
+      },
+      "verdict": "Good text match, moderate image: fuzzy=67.4%, embedding=0.76, image=0.72",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both products are busy books for toddlers with multiple pages and sensory activities, the visual design and themes are different. The Temu product features a blue color scheme with space/airplane theme while the Amazon product is green and farm-themed. The activity types on each page also differ significantly. Therefore, they are not the same physical product despite being in the same category.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 10.562909603118896,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099814510192",
+      "amazon_id": "B08P5K9Y8Y",
+      "confidence": 0.719,
+      "temu_title": "Musical Toys For Toddlers 1 2 3 Year Old, Baby Toys Duck, Dancing Walking Duck Toy With Music And Lights, Kids' Musical Instruments, Light Up Learning Toys, Learning Toy For Baby Kids",
+      "amazon_title": "Baby Piano Toy 6 to 12 Months Light Up Music Baby Toys for 0 6 9 12 18 Months Early Learning Educational Piano Keyboard Infant Babies Girl Toy 1 Year Old Boy Girls Gift",
+      "temu_price": 11.22,
+      "amazon_price": 14.44,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 61.3,
+        "embedding": 0.699,
+        "image": 0.802
+      },
+      "verdict": "Moderate match: fuzzy=61.3%, embedding=0.70, image=0.80",
+      "needs_review": true,
+      "llm_same_product": false,
+      "llm_rationale": "The products are different toys. Product 1 is a duck-shaped musical toy with walking and dancing features. Product 2 is an elephant-shaped piano keyboard toy. They have distinct designs and functionalities.",
+      "llm_image_similarity": 0.1,
+      "llm_processing_time": 22.834151029586792,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101576702065",
+      "amazon_id": "B0CDWW374H",
+      "confidence": 0.713,
+      "temu_title": "Musical Elephant Plush Baby Toy, Stuffed Animal with Music & Light, Baby Musical Soft Plush Toys for Infant Babies, Christmas Birthday Gifts for Boys And Girls 6+ Months",
+      "amazon_title": "Baby Sensory Toy 0-6 Month Music Animal Stuffed Plush Caterpillar Toy for Infant 0-3-6 Month Tummy Time with Baby Mirror Crinkle Rattle for 6-12 Month Carseat Toy for Newborn Boys Girls Shower Gifts",
+      "temu_price": 11.89,
+      "amazon_price": 18.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 64.3,
+        "embedding": 0.742,
+        "image": 0.733
+      },
+      "verdict": "Good text match, moderate image: fuzzy=64.3%, embedding=0.74, image=0.73",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are visually distinct: one is an elephant plush toy and the other is a caterpillar plush toy. They have different shapes, colors, and features despite both being musical baby toys.",
+      "llm_image_similarity": 0.05,
+      "llm_processing_time": 18.3706533908844,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101241992153",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.707,
+      "temu_title": "SYNCFUN Crawling Baby Toy - Tummy Time Toy for Boys & Girls, Interactive Big Crab with Intelligent Sensor, Lights, Buttons, Dancing Crab Auto-Avoiding Obstacles, Gift for Toddlers",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 13.13,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 58.4,
+        "embedding": 0.734,
+        "image": 0.761
+      },
+      "verdict": "Good text match, moderate image: fuzzy=58.4%, embedding=0.73, image=0.76",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are visually distinct: one is a crawling crab and the other is a plush octopus. While both are baby toys with musical features, their shape, design, and overall appearance differ significantly.",
+      "llm_image_similarity": 0.1,
+      "llm_processing_time": 18.146319150924683,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099566947204",
+      "amazon_id": "B07QZSDWXW",
+      "confidence": 0.706,
+      "temu_title": "3in1 Youngsters Walker & Activity Center - Red, Music Panel, Sit to Stand, Learning to Walk for Girls 12+ Months",
+      "amazon_title": "Baby Einstein Around We Grow 4-in-1 Walker, Discovery Activity Center and Table, Age 6 Months and up",
+      "temu_price": 20.7,
+      "amazon_price": 109.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 61.3,
+        "embedding": 0.601,
+        "image": 0.856
+      },
+      "verdict": "Moderate match: fuzzy=61.3%, embedding=0.60, image=0.86",
+      "needs_review": true,
+      "llm_same_product": false,
+      "llm_rationale": "The products are both baby walkers/activity centers but have significantly different designs and features. The Temu product is a more traditional push walker with a front panel of activities, while the Amazon product (Baby Einstein) is a stationary activity center that converts into a walk-behind walker and eventually a play table. The color schemes, shapes, and overall construction are distinct. The price difference is also substantial, indicating they aren't the same item.",
+      "llm_image_similarity": 0.2,
+      "llm_processing_time": 11.309242963790894,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101271932505",
+      "amazon_id": "B09BB1VS14",
+      "confidence": 0.704,
+      "temu_title": "SYNCFUN Pound a Ball Toy for Toddler Track Learning Station with Hammer, Toy, Christmas and Birthday Gift for Boys & Girls Age18 months+",
+      "amazon_title": "MINGKIDS Montessori Toys for 1 Year Old, 6 Pc Multi Sensory Shape, Toddler Developmental Learning Birthday Gifts, Baby Toys 12 Month",
+      "temu_price": 13.57,
+      "amazon_price": 12.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 59.6,
+        "embedding": 0.647,
+        "image": 0.821
+      },
+      "verdict": "Moderate match: fuzzy=59.6%, embedding=0.65, image=0.82",
+      "needs_review": true,
+      "llm_same_product": false,
+      "llm_rationale": "The products are different toys. Product 1 is a 'pound a ball' track toy with a hammer, while product 2 is a shape-sorting cube. They have distinct designs and functionalities.",
+      "llm_image_similarity": 0.1,
+      "llm_processing_time": 24.54334259033203,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099580752746",
+      "amazon_id": "B09B2BM8F7",
+      "confidence": 0.702,
+      "temu_title": "2in 1 Baby Play And Gym Mat with Walker, Sit to Stand Learning Walker, Baby Items Baby Activity Center with Piano, Baby Tummy Time Mat with Music And Light,, Easter Gifts for Newborns Toddlers Boys Gi",
+      "amazon_title": "Baby & Toddler Toys, Baby Activity Center 6 to 12-18 Month Old, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "temu_price": 41.59,
+      "amazon_price": 26.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 66.4,
+        "embedding": 0.73,
+        "image": 0.701
+      },
+      "verdict": "Good text match, moderate image: fuzzy=66.4%, embedding=0.73, image=0.70",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The Temu product is a walker/activity center with a play mat and appears to be designed for babies learning to stand and walk. The Amazon product is a stationary musical activity table. They have different shapes, features, and intended uses despite both being baby toys.",
+      "llm_image_similarity": 0.2,
+      "llm_processing_time": 18.321244478225708,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099605046230",
+      "amazon_id": "B0B5XPFKC3",
+      "confidence": 0.698,
+      "temu_title": "[6+ Months Musical Baby Toy] Musical Baby Toys Penguin | 6+ Months Tummy Time Toys With Music & Lights, Light Up Learning Toys, Dancing Crawling Baby Toy, Baby Easter Basket Stuffers Halloween Christm",
+      "amazon_title": "control future Crawling Crab Baby Toy - Infant Tummy Time Toys 3 4 5 6 7 8 9 10 11 12 Babies Boy 3-6 6-12 Learning Crawl 9-12 12-18 Walking Toddler 36 Months Old Music Development 1st Birthday Gifts",
+      "temu_price": 13.94,
+      "amazon_price": 19.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 58.5,
+        "embedding": 0.764,
+        "image": 0.71
+      },
+      "verdict": "Good text match, moderate image: fuzzy=58.5%, embedding=0.76, image=0.71",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "The products are visually distinct: one is a penguin-shaped toy and the other is a crab-shaped toy. They have different features and designs despite both being musical baby toys.",
+      "llm_image_similarity": 0.05,
+      "llm_processing_time": 19.234691858291626,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601099580830808",
+      "amazon_id": "B08P5K9Y8Y",
+      "confidence": 0.697,
+      "temu_title": "Attractive and educational piano keyboard toys, pre-loaded songs and lights for early learning and development",
+      "amazon_title": "Baby Piano Toy 6 to 12 Months Light Up Music Baby Toys for 0 6 9 12 18 Months Early Learning Educational Piano Keyboard Infant Babies Girl Toy 1 Year Old Boy Girls Gift",
+      "temu_price": 9.06,
+      "amazon_price": 14.44,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 66.2,
+        "embedding": 0.726,
+        "image": 0.694
+      },
+      "verdict": "Good text match, moderate image: fuzzy=66.2%, embedding=0.73, image=0.69",
+      "needs_review": true,
+      "llm_same_product": false,
+      "llm_rationale": "The products are both baby piano toys but have significantly different designs. The Temu product features a multi-colored, abstract design with various shapes and buttons, while the Amazon product is shaped like an elephant. They do not appear to be the same physical item despite belonging to the same category.",
+      "llm_image_similarity": 0.2,
+      "llm_processing_time": 19.562084197998047,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601100011593772",
+      "amazon_id": "B0BTBV51KY",
+      "confidence": 0.697,
+      "temu_title": "4 In 1 Rocking Horse For Toddlers 1-3 Years Old, Baby Rocking Toy Fun Birthday Gift For 1+ Kids, Ride On Toy With Guard Rails, Detachable Balance Board And Footrest, Balance Bike With Push Handle",
+      "amazon_title": "iPlay, iLearn Press to Go Car Toys for Toddlers 1-3, Baby Animal Racing Cars, Infant Play Vehicle Set, Baby Push Go Friction Car Toys for 6-9-12-18 Months, 1st Birthday Gifts for 1-2 Years Old Boys",
+      "temu_price": 51.33,
+      "amazon_price": 17.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 61.3,
+        "embedding": 0.685,
+        "image": 0.76
+      },
+      "verdict": "Moderate match: fuzzy=61.3%, embedding=0.68, image=0.76",
+      "needs_review": true,
+      "llm_same_product": false,
+      "llm_rationale": "The products are distinctly different. Product 1 is a rocking horse/ride-on toy with a handle and rocker base, while Product 2 is a set of small friction-powered car toys. They have completely different shapes, features, and functionalities.",
+      "llm_image_similarity": 0.1,
+      "llm_processing_time": 17.12288784980774,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101224461926",
+      "amazon_id": "B0CY4X37RD",
+      "confidence": 0.692,
+      "temu_title": "48cm Realistic Reborn Cloth Body Doll with 3D-painting Skin and Visible Veins, Alive 19 Inches Soft Vinyl Newborn Baby Handmade Dress Birthday Toy for 3+ Kids Christmas Gift",
+      "amazon_title": "BABESIDE Baby Dolls, 17inch Large Realistic Cute Soft Body Baby Doll Real Life Baby Dolls with Accessories for 3+ Year Old Girls Gifts, Pretend Play, Collection",
+      "temu_price": 21.38,
+      "amazon_price": 23.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 53.3,
+        "embedding": 0.736,
+        "image": 0.752
+      },
+      "verdict": "Good text match, moderate image: fuzzy=53.3%, embedding=0.74, image=0.75",
+      "needs_review": false,
+      "llm_same_product": false,
+      "llm_rationale": "While both are realistic reborn baby dolls, the images show different doll sculpts and outfits. The Temu doll appears to have more detailed skin painting (visible veins) and a simpler outfit while the Amazon doll has a unicorn themed outfit. Size is also slightly different (19 inches vs 17 inches). These differences suggest they are not the same product.",
+      "llm_image_similarity": 0.6,
+      "llm_processing_time": 25.684383153915405,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101723107431",
+      "amazon_id": "B0DGXCDWX6",
+      "confidence": 0.689,
+      "temu_title": "18pcs Deluxe Baby Activity Gym Set - Comprehensive Development System for Movement, Cognition, And Sensory Exploration - Ideal Christmas Gift for Newborns And Toddlers, Boys And Girls",
+      "amazon_title": "Blissful Diary Baby Play Gym & Activity Mat, 5 Developmental Zones Wooden Tummy Time Mat with 6 Detachable Sensory Toys for Motor Skills & Sensory Development, Baby Essentials Shower Gift",
+      "temu_price": 22.18,
+      "amazon_price": 89.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 56.2,
+        "embedding": 0.606,
+        "image": 0.841
+      },
+      "verdict": "Moderate match: fuzzy=56.2%, embedding=0.61, image=0.84",
+      "needs_review": true,
+      "llm_same_product": false,
+      "llm_rationale": "While both products are baby activity gyms, they differ significantly in design and materials. The Temu product appears to have a fabric frame with a space theme, while the Amazon product features a wooden arch and a different color scheme/design on the mat. The accessories also look distinct. A 305% price difference is unreasonable for the same item.",
+      "llm_image_similarity": 0.3,
+      "llm_processing_time": 10.12865400314331,
+      "llm_processed": true
+    },
+    {
+      "temu_id": "601101723062663",
+      "amazon_id": "B0DGXCDWX6",
+      "confidence": 0.688,
+      "temu_title": "18pcs Deluxe Baby Activity Gym Set - Comprehensive Development System For Movement, Cognition, And Sensory Exploration - Ideal Christmas Gift For Newborns And Toddlers, Boys And Girls",
+      "amazon_title": "Blissful Diary Baby Play Gym & Activity Mat, 5 Developmental Zones Wooden Tummy Time Mat with 6 Detachable Sensory Toys for Motor Skills & Sensory Development, Baby Essentials Shower Gift",
+      "temu_price": 22.18,
+      "amazon_price": 89.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 56.2,
+        "embedding": 0.606,
+        "image": 0.837
+      },
+      "verdict": "Moderate match: fuzzy=56.2%, embedding=0.61, image=0.84",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099998992607",
+      "amazon_id": "B09B2BM8F7",
+      "confidence": 0.672,
+      "temu_title": "5-in-1 Youngsters Walker Sit-to-Stand Early Learning Walker for Youngsters, Youngsters Balance Bike/Push Walker/Activity Table/Detachable Panel with Music, for 12 Months+ Youngsters, Youngsters Boys &",
+      "amazon_title": "Baby & Toddler Toys, Baby Activity Center 6 to 12-18 Month Old, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "temu_price": 24.47,
+      "amazon_price": 26.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 63.1,
+        "embedding": 0.576,
+        "image": 0.782
+      },
+      "verdict": "Moderate match: fuzzy=63.1%, embedding=0.58, image=0.78",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099880980191",
+      "amazon_id": "B0CDWW374H",
+      "confidence": 0.671,
+      "temu_title": "Youngsters's Rattle Plush Animal Deer Toy, Sensory Music Toy with Wrinkled Paper, Rattle, Squeak, Suitable for 0-6-12 Months Boys and Girls to Play Lying Down. Perfect Valentine's Day, Christmas, Birt",
+      "amazon_title": "Baby Sensory Toy 0-6 Month Music Animal Stuffed Plush Caterpillar Toy for Infant 0-3-6 Month Tummy Time with Baby Mirror Crinkle Rattle for 6-12 Month Carseat Toy for Newborn Boys Girls Shower Gifts",
+      "temu_price": 11.43,
+      "amazon_price": 18.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 58.1,
+        "embedding": 0.716,
+        "image": 0.689
+      },
+      "verdict": "Good text match, moderate image: fuzzy=58.1%, embedding=0.72, image=0.69",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100764454857",
+      "amazon_id": "B09B2BM8F7",
+      "confidence": 0.671,
+      "temu_title": "Kids Tablet Learning Board With LED Screen Teaches Alphabets Numbers Words Music Math Early Development Interactive Electronic Toys For Boys And Girls 3 Years +",
+      "amazon_title": "Baby & Toddler Toys, Baby Activity Center 6 to 12-18 Month Old, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "temu_price": 8.79,
+      "amazon_price": 26.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 55.9,
+        "embedding": 0.634,
+        "image": 0.772
+      },
+      "verdict": "Moderate match: fuzzy=55.9%, embedding=0.63, image=0.77",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100060663727",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.662,
+      "temu_title": "[Musical Glowing Star Plush] Musical Glowing Purple Star Plush Toy | Soft Starlight Night Light, Melodic Plushie For Kids Bedrooms & Birthday Parties, Cute LED Stuffed Animal Gift For Children And Cou",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 11.29,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 51.7,
+        "embedding": 0.549,
+        "image": 0.852
+      },
+      "verdict": "Moderate match: fuzzy=51.7%, embedding=0.55, image=0.85",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099999734086",
+      "amazon_id": "B072JNNTGB",
+      "confidence": 0.659,
+      "temu_title": "43/5000Baby Crawling Toys With Star Projection, Music And Lights, Interactive Baby Sensory Play, Early Childhood Development Toys, Christmas Toys",
+      "amazon_title": "Skip Hop Baby Follow-Me Bee Tummy Time Crawl Toy 3-Stage Infant Sensory Development with Lights Sounds and Music Explore & More Age 5m+",
+      "temu_price": 12.72,
+      "amazon_price": 27.0,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 57.1,
+        "embedding": 0.575,
+        "image": 0.787
+      },
+      "verdict": "Moderate match: fuzzy=57.1%, embedding=0.58, image=0.79",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101022118060",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.656,
+      "temu_title": "Glow-in-the-Dark Musical Cat Plush Toy with Rainbow Lights & Music Notes - Soft Polyester Stuffed Animal for Kids, Birthday Party Decor, Mother's Day Gift, Safe Non-Toxic Material, Playful Decor, Vibr",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 14.25,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 51.4,
+        "embedding": 0.572,
+        "image": 0.819
+      },
+      "verdict": "Moderate match: fuzzy=51.4%, embedding=0.57, image=0.82",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099649991630",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.652,
+      "temu_title": "Baby Musical Mobile Crib with Soothing Music, Colorful Lights & Animal Projection, Interactive Take-Along Rattle & Lullaby Music Box \u2013 Multicolor Nursery Toy for Infant Sleep & Sensory Development, An",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 12.45,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 58.3,
+        "embedding": 0.672,
+        "image": 0.679
+      },
+      "verdict": "Moderate match: fuzzy=58.3%, embedding=0.67, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101699219787",
+      "amazon_id": "B01NCUPCD4",
+      "confidence": 0.649,
+      "temu_title": "12' Musical Light Up Husky Puppy Stuffed Animal Realistic LED Singing Dog Soft Plush Toy With Night Lights Glow In The Dark Birthday Valentines Christmas For Toddler Kids",
+      "amazon_title": "Fisher-Price Baby & Toddler Toy Laugh & Learn Smart Stages Puppy Musical Plush with Lights & Phrases for Infants Ages 6+ Months",
+      "temu_price": 14.94,
+      "amazon_price": 18.69,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 56.8,
+        "embedding": 0.648,
+        "image": 0.7
+      },
+      "verdict": "Moderate match: fuzzy=56.8%, embedding=0.65, image=0.70",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101378157562",
+      "amazon_id": "B019ICFYNI",
+      "confidence": 0.645,
+      "temu_title": "Puppy Ringing Toy - Hand-Crank Musical rattle with Bell, Develops Grip Strength & Hearing Skills, Learning Toy with Easy-Grip Ring, Birthday or Christmas Gift and (Yellow), Puppy Toy, Skill Developmen",
+      "amazon_title": "VTech Baby Rattle and Sing Puppy",
+      "temu_price": 3.14,
+      "amazon_price": 0.0,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 60.0,
+        "embedding": 0.559,
+        "image": 0.749
+      },
+      "verdict": "Moderate match: fuzzy=60.0%, embedding=0.56, image=0.75",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099618858485",
+      "amazon_id": "B09B2BM8F7",
+      "confidence": 0.645,
+      "temu_title": "Baby Walkers, 5 And 1 Baby Walker With Wheels, Walker For Babies 4-Height Baby Walkers And Activity Center For Boys Girls, Baby Walkers For Babies 6-36 Months, Baby Walkers And Activity Center (Grey)",
+      "amazon_title": "Baby & Toddler Toys, Baby Activity Center 6 to 12-18 Month Old, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "temu_price": 54.45,
+      "amazon_price": 26.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 64.6,
+        "embedding": 0.627,
+        "image": 0.661
+      },
+      "verdict": "Moderate match: fuzzy=64.6%, embedding=0.63, image=0.66",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099936256368",
+      "amazon_id": "B004N7NFSK",
+      "confidence": 0.645,
+      "temu_title": "Glow-in-the-Dark Plush Bunny with Musical notes - 14\" Glow-in-the-Dark Stuffed Animal, Soft Rabbit Toy with Bedtime Companion for Kids Girls Boys, Birthday Easter Christmas Gifts - Safe Plush Rabbit,",
+      "amazon_title": "Melissa & Doug Burrow Bunny Rabbit Stuffed Animal (9 inches)",
+      "temu_price": 13.5,
+      "amazon_price": 12.97,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 65.1,
+        "embedding": 0.599,
+        "image": 0.682
+      },
+      "verdict": "Moderate match: fuzzy=65.1%, embedding=0.60, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099834911292",
+      "amazon_id": "B0DRLJ7XHD",
+      "confidence": 0.642,
+      "temu_title": "[Musical Baby Toy] Cute Baby Music Rotating Bed Bell Toy | Crib Mobile with Night Light, Baby Bedside Rattle Toy, Newborn Night Light, Music Projection Rotating Bedside Bell, Modern Baby Hanging Mobil",
+      "amazon_title": "Baby Einstein Sea Dreams Soother Musical Crib Toy and Sound Machine, Pink, Newborn and up",
+      "temu_price": 12.39,
+      "amazon_price": 39.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.2,
+        "embedding": 0.669,
+        "image": 0.68
+      },
+      "verdict": "Moderate match: fuzzy=54.2%, embedding=0.67, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101310944717",
+      "amazon_id": "B09L4W8LKQ",
+      "confidence": 0.64,
+      "temu_title": "Ringing Bell, Interactive Toy, Suitable For Newborn Babies, Stimulates Hearing, Exercises Grip Strength, Boys And Girls, 2pcs Set",
+      "amazon_title": "FPVERA Spiral Car Seat & Stroller Activity Toy - Baby Sensory Toys Soft Hanging Toys for Babies 0-12 Months Boys Girls Carseat Crib Stroller, with Ringing Bell, Music",
+      "temu_price": 3.42,
+      "amazon_price": 12.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 59.8,
+        "embedding": 0.657,
+        "image": 0.65
+      },
+      "verdict": "Moderate match: fuzzy=59.8%, embedding=0.66, image=0.65",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099632385564",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.639,
+      "temu_title": "Adorable Blue Octopus Shower Toy with Automatic Water Spray & Light - Cute Cartoon Design, Ideal for Youngsters's Bath Time Fun, Perfect Holiday Gift for Halloween, Thanksgiving, Christmas & Easter, O",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 6.7,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 49.1,
+        "embedding": 0.606,
+        "image": 0.761
+      },
+      "verdict": "Moderate match: fuzzy=49.1%, embedding=0.61, image=0.76",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101055050019",
+      "amazon_id": "B0F3X38LYF",
+      "confidence": 0.631,
+      "temu_title": "Interactive Dance Duck Toy With Music, Flash, And Moving Wings - A Battery Powered Educational Sensory Toy Suitable For Children Aged 3-6, Christmas And Halloween Gift (excluding Batteries)",
+      "amazon_title": "Octopus Baby Crawling Musical Interactive Toys with 97 Melodies, Talking Repeat Function Language Learning for Newborn Infant, Safe Plush Sensory Learning Montessori Toy for Toddlers Gift 0+ Months",
+      "temu_price": 7.68,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 51.1,
+        "embedding": 0.664,
+        "image": 0.677
+      },
+      "verdict": "Moderate match: fuzzy=51.1%, embedding=0.66, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099998917905",
+      "amazon_id": "B09B2BM8F7",
+      "confidence": 0.631,
+      "temu_title": "5-in-1 Youngsters's Walker, Sitting and Standing Early Learning Walker, Suitable for 1/2/3 Years Old Youngsters, Youngsters's Balance Bike/Push Walker/Movable Table/Detachable Panel with Music, Suitab",
+      "amazon_title": "Baby & Toddler Toys, Baby Activity Center 6 to 12-18 Month Old, Learning Musical Table Toys for 1 2 3 Year Old Boys Girls Gifts",
+      "temu_price": 25.89,
+      "amazon_price": 26.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 52.6,
+        "embedding": 0.532,
+        "image": 0.782
+      },
+      "verdict": "Moderate match: fuzzy=52.6%, embedding=0.53, image=0.78",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101384377522",
+      "amazon_id": "B07PGMVVC2",
+      "confidence": 0.63,
+      "temu_title": "LED Glow-in-the-Dark Triceratops Plush Toy with Night Light & Lullaby - Soft Blue Dinosaur Stuffed animal, Safe LED Lights & Plush Fabric for Bedtime, Birthday, Nursery Decor - Toddler Girls & Boys Gi",
+      "amazon_title": "Pro Goleem Elephant Security Blanket, Soft Lovey Unisex Lovie Baby Gifts for Newborn Boys and Girls Snuggle Toy Stuffed Animal Grey 16 Inch",
+      "temu_price": 12.16,
+      "amazon_price": 13.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 52.7,
+        "embedding": 0.592,
+        "image": 0.728
+      },
+      "verdict": "Moderate match: fuzzy=52.7%, embedding=0.59, image=0.73",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101451691154",
+      "amazon_id": "B0CDWW374H",
+      "confidence": 0.629,
+      "temu_title": "Glow-in-the-Dark Blue Dinosaur Plush Toy with Music Notes - Soft Polyester Stuffed Animal, Ideal Birthday & Holiday Gift for Boys and Girls, Interactive Light-Up Dinosaur, Dinosaur Toys, Playful Desig",
+      "amazon_title": "Baby Sensory Toy 0-6 Month Music Animal Stuffed Plush Caterpillar Toy for Infant 0-3-6 Month Tummy Time with Baby Mirror Crinkle Rattle for 6-12 Month Carseat Toy for Newborn Boys Girls Shower Gifts",
+      "temu_price": 19.77,
+      "amazon_price": 18.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.5,
+        "embedding": 0.575,
+        "image": 0.728
+      },
+      "verdict": "Moderate match: fuzzy=54.5%, embedding=0.58, image=0.73",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099677773673",
+      "amazon_id": "B01AC7SF7K",
+      "confidence": 0.627,
+      "temu_title": "Cute Giraffe Can Sing And Learn to Talk Electric Stuffed Animal Funny Toy Birthday Gift Doll Decoration Halloween Christmas Easter Gift (no Batteries)",
+      "amazon_title": "Baby GUND Animated Flappy the Elephant Plush, Singing Stuffed Animal Baby Toy for Ages 0 and Up, Gray, 12\"",
+      "temu_price": 14.3,
+      "amazon_price": 38.79,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 50.6,
+        "embedding": 0.615,
+        "image": 0.712
+      },
+      "verdict": "Moderate match: fuzzy=50.6%, embedding=0.62, image=0.71",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101612579780",
+      "amazon_id": "B07PGMVVC2",
+      "confidence": 0.625,
+      "temu_title": "Glow-in-the-Dark Puppy Plush Toy - Soft Blue Stuffed animal with Night Light, Pastel Green to Pink Glow, Nursery Decor, Bedtime Companion & Relax Toy for Kids - Father's Day Gift for Boys and Girls, D",
+      "amazon_title": "Pro Goleem Elephant Security Blanket, Soft Lovey Unisex Lovie Baby Gifts for Newborn Boys and Girls Snuggle Toy Stuffed Animal Grey 16 Inch",
+      "temu_price": 13.45,
+      "amazon_price": 13.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.4,
+        "embedding": 0.6,
+        "image": 0.698
+      },
+      "verdict": "Moderate match: fuzzy=54.4%, embedding=0.60, image=0.70",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100515780512",
+      "amazon_id": "B00I3K25R0",
+      "confidence": 0.613,
+      "temu_title": "1pc/3pcsColorful Wind-Up Clownfish Toy For Youngsters Ages 3-6 - Durable ABS, Perfect For Bath Time & Outdoor Play, Available In Pink, Blue, Yellow - Ideal Halloween & Christmas Gift",
+      "amazon_title": "Munchkin\u00ae Float & Play Bubbles\u2122 Baby and Toddler Bath Toy, 4 Count",
+      "temu_price": 3.93,
+      "amazon_price": 6.15,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 47.4,
+        "embedding": 0.568,
+        "image": 0.74
+      },
+      "verdict": "Moderate match: fuzzy=47.4%, embedding=0.57, image=0.74",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099787916902",
+      "amazon_id": "B0BGN2HQHH",
+      "confidence": 0.612,
+      "temu_title": "1pc Kids Battery-Powered Driving Steering Wheel Toy with Lights, Music, and Educational Features - Non-Rechargeable AA Battery Operated Activity Center for Ages 1-3, Safe Rounded Edges Plastic Materia",
+      "amazon_title": "Kikidex Magnetic Drawing Board, Toddler Girl Toys for 1-2 Year Old, Doodle Board Pad Learning and Educational Toys for 1 2 3 Year Old Baby Kids Birthday Gift(Soft Pink)",
+      "temu_price": 10.86,
+      "amazon_price": 25.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 51.7,
+        "embedding": 0.584,
+        "image": 0.697
+      },
+      "verdict": "Moderate match: fuzzy=51.7%, embedding=0.58, image=0.70",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099685274187",
+      "amazon_id": "B01AC7SF7K",
+      "confidence": 0.608,
+      "temu_title": "Cute 12 Inch LED Light Panda Bear Plush - Hugging Stuffed Animals Toy Gift - Birthday, Christmas, Mother's Day, Xmas, Home Decor",
+      "amazon_title": "Baby GUND Animated Flappy the Elephant Plush, Singing Stuffed Animal Baby Toy for Ages 0 and Up, Gray, 12\"",
+      "temu_price": 5.45,
+      "amazon_price": 38.79,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 55.7,
+        "embedding": 0.635,
+        "image": 0.615
+      },
+      "verdict": "Moderate match: fuzzy=55.7%, embedding=0.63, image=0.62",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101203001072",
+      "amazon_id": "B01AC7SF7K",
+      "confidence": 0.608,
+      "temu_title": "Light Up Unicorn night light for kids, kids night light, stuffed animals, baby toys, plush, toys, dog toys, plush animals, throw pillows for couch, Gifts for Girls, home decor, birthday gifts for wome",
+      "amazon_title": "Baby GUND Animated Flappy the Elephant Plush, Singing Stuffed Animal Baby Toy for Ages 0 and Up, Gray, 12\"",
+      "temu_price": 9.32,
+      "amazon_price": 38.79,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 55.6,
+        "embedding": 0.504,
+        "image": 0.731
+      },
+      "verdict": "Moderate match: fuzzy=55.6%, embedding=0.50, image=0.73",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101700841531",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.605,
+      "temu_title": "Glowing Blue Dinosaur Plush Toy with Lights - Soft Stuffed Dinosaur for Boys & Girls, Perfect Christmas Birthday Gift, Party Decoration, Interactive Kids' Companion Doll, Dinosaur Toys, Playful Design",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 12.83,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 56.1,
+        "embedding": 0.529,
+        "image": 0.699
+      },
+      "verdict": "Moderate match: fuzzy=56.1%, embedding=0.53, image=0.70",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100682494172",
+      "amazon_id": "B0DGXCDWX6",
+      "confidence": 0.605,
+      "temu_title": "Crawling Game Fence Mat With Cute Cartoon Patterns, Play Game Mat, Baby Swing Suitable For Family Living Rooms, Car Picnics, Travel Home Essentials XPE 50 * 50 Inches, Thick And Soft Size Double-sided",
+      "amazon_title": "Blissful Diary Baby Play Gym & Activity Mat, 5 Developmental Zones Wooden Tummy Time Mat with 6 Detachable Sensory Toys for Motor Skills & Sensory Development, Baby Essentials Shower Gift",
+      "temu_price": 17.38,
+      "amazon_price": 89.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 48.3,
+        "embedding": 0.622,
+        "image": 0.665
+      },
+      "verdict": "Moderate match: fuzzy=48.3%, embedding=0.62, image=0.67",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100816909735",
+      "amazon_id": "B08SZLRC67",
+      "confidence": 0.598,
+      "temu_title": "1pc Disney- Stitch Plush Doll with Pink & Blue Stitch Holding Xiaojin & Bow - Soft Fabric Home Decor, Valentine's Day Gift for Family & Friends, Highquality Stitching",
+      "amazon_title": "Itzy Ritzy - Itzy Lovey Including Teether - Baby Lovey with Teether, Textured Ribbons & Dangle Arms - Features Crinkle Sound, Sherpa Fabric and Minky Plush (Pink Bunny)",
+      "temu_price": 19.75,
+      "amazon_price": 8.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 50.0,
+        "embedding": 0.506,
+        "image": 0.74
+      },
+      "verdict": "Moderate match: fuzzy=50.0%, embedding=0.51, image=0.74",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099895539269",
+      "amazon_id": "B0CDWW374H",
+      "confidence": 0.597,
+      "temu_title": "[Musical Glowing Dinosaur] Glowing Blue Musical Dinosaur Plush Toy | Cute Soft Stuffed Animal, Mother's Day Gifts, Dinosaur Theme Birthday Gift for Kids Friends",
+      "amazon_title": "Baby Sensory Toy 0-6 Month Music Animal Stuffed Plush Caterpillar Toy for Infant 0-3-6 Month Tummy Time with Baby Mirror Crinkle Rattle for 6-12 Month Carseat Toy for Newborn Boys Girls Shower Gifts",
+      "temu_price": 15.85,
+      "amazon_price": 18.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 57.4,
+        "embedding": 0.561,
+        "image": 0.643
+      },
+      "verdict": "Moderate match: fuzzy=57.4%, embedding=0.56, image=0.64",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101055880093",
+      "amazon_id": "B07PGMVVC2",
+      "confidence": 0.597,
+      "temu_title": "Musical Blue LED Light Up Dinosaur Glowing Plush Animal Night Light Plush Toy Hug Soft Cute Gift For Kids Boys Girls Decoration Holiday Birthday Gift, Valentine'S Day Gift, Perfect Gift, 14in",
+      "amazon_title": "Pro Goleem Elephant Security Blanket, Soft Lovey Unisex Lovie Baby Gifts for Newborn Boys and Girls Snuggle Toy Stuffed Animal Grey 16 Inch",
+      "temu_price": 13.14,
+      "amazon_price": 13.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 53.7,
+        "embedding": 0.526,
+        "image": 0.697
+      },
+      "verdict": "Moderate match: fuzzy=53.7%, embedding=0.53, image=0.70",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "602649122438446",
+      "amazon_id": "B00OZAI56M",
+      "confidence": 0.596,
+      "temu_title": "YOLAY Baby Push Walker, Sit to Stand Walker Wth Engaging Sounds & Detachable Play Center, Educational Learning Panel with Adjustable Speed for First Steps",
+      "amazon_title": "Fisher-Price Baby & Toddler Toy Laugh & Learn Smart Stages Piggy Bank with Educational Songs & Phrases for Infants Ages 6+ Months",
+      "temu_price": 25.97,
+      "amazon_price": 19.49,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.1,
+        "embedding": 0.524,
+        "image": 0.695
+      },
+      "verdict": "Moderate match: fuzzy=54.1%, embedding=0.52, image=0.69",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099563847186",
+      "amazon_id": "B0BGN2HQHH",
+      "confidence": 0.595,
+      "temu_title": "Kids Toy Tent Including Star Lights And Balloons, Boys And Girls Play Tent, Princess Theater, Indoor Pink Castle Fantasy Fairy Tale Tent, Birthday Holiday Gift, Safe Material",
+      "amazon_title": "Kikidex Magnetic Drawing Board, Toddler Girl Toys for 1-2 Year Old, Doodle Board Pad Learning and Educational Toys for 1 2 3 Year Old Baby Kids Birthday Gift(Soft Pink)",
+      "temu_price": 17.98,
+      "amazon_price": 25.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 53.5,
+        "embedding": 0.564,
+        "image": 0.66
+      },
+      "verdict": "Moderate match: fuzzy=53.5%, embedding=0.56, image=0.66",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099663952594",
+      "amazon_id": "B00I3K25R0",
+      "confidence": 0.592,
+      "temu_title": "Bubble Play Mat for Kids - 50 x 50 x 0.4 inches, softer crawling mat with dinosaur design, easy to clean, made of high-quality PE material, 100% non-toxic and, Safe Infant Play, Playful Baby Decor, Ea",
+      "amazon_title": "Munchkin\u00ae Float & Play Bubbles\u2122 Baby and Toddler Bath Toy, 4 Count",
+      "temu_price": 17.43,
+      "amazon_price": 6.15,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 53.3,
+        "embedding": 0.554,
+        "image": 0.661
+      },
+      "verdict": "Moderate match: fuzzy=53.3%, embedding=0.55, image=0.66",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099954585483",
+      "amazon_id": "B0C7TGGD4V",
+      "confidence": 0.592,
+      "temu_title": "Cute Animal Early Learning Phone for Youngsters 0-3 Years - Portable Educational Toy with Music, Stories & Fun Icons, Pink/Blue/Yellow, Ideal Gift for Christmas & Halloween",
+      "amazon_title": "Interactive Pop up Animal Toys with Music & Light, Montessori Cause and Effect for 1 Year Old Boy Girl Early Learning Musical Baby 9-12-18 Months STEM Toddler Age 1-2 Gift Infant 35165M",
+      "temu_price": 6.16,
+      "amazon_price": 25.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.2,
+        "embedding": 0.661,
+        "image": 0.562
+      },
+      "verdict": "Moderate match: fuzzy=54.2%, embedding=0.66, image=0.56",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101385607479",
+      "amazon_id": "B0BGN2HQHH",
+      "confidence": 0.589,
+      "temu_title": "Glowing Blue Triceratops Plush Toy with LED Magic Night Light & Lullaby - Soft Dinosaur Stuffed Animal, Plush Fabric Nursery Bedtime Companion for Toddlers, Kids Birthday Christmas Gift, Stuffed Plush",
+      "amazon_title": "Kikidex Magnetic Drawing Board, Toddler Girl Toys for 1-2 Year Old, Doodle Board Pad Learning and Educational Toys for 1 2 3 Year Old Baby Kids Birthday Gift(Soft Pink)",
+      "temu_price": 14.24,
+      "amazon_price": 25.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 52.2,
+        "embedding": 0.577,
+        "image": 0.641
+      },
+      "verdict": "Moderate match: fuzzy=52.2%, embedding=0.58, image=0.64",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100070607738",
+      "amazon_id": "B004N7NFSK",
+      "confidence": 0.587,
+      "temu_title": "Birthday Teddy Bear Interactive Stuffed Animal Electric Singing Music Plush Toy With Cupcake, Glowing Candle Teddy Bear Gift For Kids Girls Boys Birthday Holiday 13.5 Inch",
+      "amazon_title": "Melissa & Doug Burrow Bunny Rabbit Stuffed Animal (9 inches)",
+      "temu_price": 13.93,
+      "amazon_price": 12.97,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 55.8,
+        "embedding": 0.539,
+        "image": 0.647
+      },
+      "verdict": "Moderate match: fuzzy=55.8%, embedding=0.54, image=0.65",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100249942059",
+      "amazon_id": "B0843HW6C9",
+      "confidence": 0.58,
+      "temu_title": "ABC Kids Rug for Playroom Local Warehouse Baby Play Mat Alphabet Rug Animal Number Shape Classroom Rug Kids Playroom Rug Early Learning Carpet for Educational Learning & Game Area Preschool",
+      "amazon_title": "Kidoozie Ball Drop | Toddler Toy | Learning & Developmental Tower | Activity & Educational Preschool Toys & Games",
+      "temu_price": 10.71,
+      "amazon_price": 14.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.7,
+        "embedding": 0.549,
+        "image": 0.629
+      },
+      "verdict": "Moderate match: fuzzy=54.7%, embedding=0.55, image=0.63",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099813032769",
+      "amazon_id": "B0BTBV51KY",
+      "confidence": 0.58,
+      "temu_title": "Children's Press Small Car Boy Inertial Pull Back Car Educational Toys Fall Resistant",
+      "amazon_title": "iPlay, iLearn Press to Go Car Toys for Toddlers 1-3, Baby Animal Racing Cars, Infant Play Vehicle Set, Baby Push Go Friction Car Toys for 6-9-12-18 Months, 1st Birthday Gifts for 1-2 Years Old Boys",
+      "temu_price": 6.49,
+      "amazon_price": 17.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 50.6,
+        "embedding": 0.516,
+        "image": 0.682
+      },
+      "verdict": "Moderate match: fuzzy=50.6%, embedding=0.52, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100681645510",
+      "amazon_id": "B098NCLFGD",
+      "confidence": 0.576,
+      "temu_title": "Youngsters'S Giraffe Ball Pit, Free Installation Pop-up Pool Tent, Top Basketball Frame, Portable Beach Backyard Game Tent Toy, Suitable For Indoor And Outdoor, Boys And Girls Best Holiday Gift",
+      "amazon_title": "Toddlers Montessori Wooden Educational Toys for Baby Boys Girls Age 1 2 3 Year Old, Shape Sorting Toys 1st One First Birthday Girl Gifts for Kids 1-3, Wood Preschool Learning Fine Motor Skills Game",
+      "temu_price": 7.11,
+      "amazon_price": 22.49,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 50.4,
+        "embedding": 0.54,
+        "image": 0.652
+      },
+      "verdict": "Moderate match: fuzzy=50.4%, embedding=0.54, image=0.65",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099642214259",
+      "amazon_id": "B01K1K0K6M",
+      "confidence": 0.573,
+      "temu_title": "Spacious 3-In-1 Foldable Playhouse Tent - Portable, Easy to Assemble - Perfect Gift for Kids, Ocean Ball Pool Fence (Without Ball) Suitable for Both Indoor And Outdoor Use",
+      "amazon_title": "Step2 Rain Showers Splash Pond Toddler Water Table, Kids Water and Sand Activity Sensory Playset, Summer Outdoor Toys, 13 Piece Toy Accessories, For Toddles 1.5+ Years Old",
+      "temu_price": 17.31,
+      "amazon_price": 70.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 48.5,
+        "embedding": 0.414,
+        "image": 0.766
+      },
+      "verdict": "Moderate match: fuzzy=48.5%, embedding=0.41, image=0.77",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100050294259",
+      "amazon_id": "B01AC7SF7K",
+      "confidence": 0.571,
+      "temu_title": "[Animated Chicken Toy] Animated Orange Musical Walking Chicken Plush Toy | Interactive Play, Holiday Decoration, Singing and Waving Functions, Western Novelty",
+      "amazon_title": "Baby GUND Animated Flappy the Elephant Plush, Singing Stuffed Animal Baby Toy for Ages 0 and Up, Gray, 12\"",
+      "temu_price": 16.29,
+      "amazon_price": 38.79,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 51.2,
+        "embedding": 0.572,
+        "image": 0.607
+      },
+      "verdict": "Moderate match: fuzzy=51.2%, embedding=0.57, image=0.61",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099979108158",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.57,
+      "temu_title": "Blue LED Light-Up Dinosaur Plush Toy - 14 Inch Soft Huggable Night Light with Musical Notes & Hearts, Cute Kids Room Decor for Boys & Girls, Perfect Birthday Valentine's Holiday Gift",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 10.97,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.4,
+        "embedding": 0.458,
+        "image": 0.684
+      },
+      "verdict": "Moderate match: fuzzy=54.4%, embedding=0.46, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101098502790",
+      "amazon_id": "B08P5K9Y8Y",
+      "confidence": 0.567,
+      "temu_title": "Electric Dancing Duck, Fun Blinking Flash, Cute Music Cartoon Animal Educational Toy, (battery Not Included) Halloween And Christmas Gift",
+      "amazon_title": "Baby Piano Toy 6 to 12 Months Light Up Music Baby Toys for 0 6 9 12 18 Months Early Learning Educational Piano Keyboard Infant Babies Girl Toy 1 Year Old Boy Girls Gift",
+      "temu_price": 8.64,
+      "amazon_price": 14.44,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 49.6,
+        "embedding": 0.491,
+        "image": 0.677
+      },
+      "verdict": "Moderate match: fuzzy=49.6%, embedding=0.49, image=0.68",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099807198018",
+      "amazon_id": "B01NCUPCD4",
+      "confidence": 0.562,
+      "temu_title": "1pc Three-button Embroidery Giraffe Can Sing And Learn to Talk Electric Plush Toy Doll Ornament Home Ornament Holiday Gift (without Batteries), Plush Toy Doll",
+      "amazon_title": "Fisher-Price Baby & Toddler Toy Laugh & Learn Smart Stages Puppy Musical Plush with Lights & Phrases for Infants Ages 6+ Months",
+      "temu_price": 18.87,
+      "amazon_price": 18.69,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 48.5,
+        "embedding": 0.557,
+        "image": 0.614
+      },
+      "verdict": "Moderate match: fuzzy=48.5%, embedding=0.56, image=0.61",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100131007162",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.562,
+      "temu_title": "14.5\" LED Glow Red Rocket Plush Toy - Soft & Cozy Night Light with White & Blue Accents, Perfect Gift for Youngsters, Youngsters, Birthdays, Valentine's Day & Christmas, Polyester Material, Holiday Gi",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 14.94,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 50.0,
+        "embedding": 0.486,
+        "image": 0.666
+      },
+      "verdict": "Moderate match: fuzzy=50.0%, embedding=0.49, image=0.67",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101024273865",
+      "amazon_id": "B01AC7SF7K",
+      "confidence": 0.558,
+      "temu_title": "Glowing Unicorn Plush Toy (Without Battery), Cute Glow In The Dark Stuffed Animal, Unicorn Theme Birthday Party Gift Toy For Kids, Ideal Playing Doll Ornaments, Happy Mother'S Day Gift Decor",
+      "amazon_title": "Baby GUND Animated Flappy the Elephant Plush, Singing Stuffed Animal Baby Toy for Ages 0 and Up, Gray, 12\"",
+      "temu_price": 17.2,
+      "amazon_price": 38.79,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 49.0,
+        "embedding": 0.602,
+        "image": 0.562
+      },
+      "verdict": "Moderate match: fuzzy=49.0%, embedding=0.60, image=0.56",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100201692000",
+      "amazon_id": "B07DM86Z43",
+      "confidence": 0.556,
+      "temu_title": "Multifunctional Marine Ball Pool Fence Children'S Game Guardrail Baby Safety Guardrail Indoor Playground",
+      "amazon_title": "Baby Einstein Sea Dreams Soother Musical Crib Toy and Sound Machine, Newborn and up",
+      "temu_price": 14.84,
+      "amazon_price": 34.92,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 47.6,
+        "embedding": 0.353,
+        "image": 0.782
+      },
+      "verdict": "Moderate match: fuzzy=47.6%, embedding=0.35, image=0.78",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601100241908953",
+      "amazon_id": "B000YDDF6O",
+      "confidence": 0.549,
+      "temu_title": "[360\u00b0 Rotating Elephant Toy] Cute Cartoon 360\u00b0 Stunt Rotating Elephant Toy | Sparkling Music Puzzle Toy, Perfect for Christmas, Halloween, And Thanksgiving Gifts [battery Not Included",
+      "amazon_title": "Baby Einstein Take Along Tunes Musical Toy, Ages 3 months +",
+      "temu_price": 10.46,
+      "amazon_price": 9.96,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 48.2,
+        "embedding": 0.502,
+        "image": 0.632
+      },
+      "verdict": "Moderate match: fuzzy=48.2%, embedding=0.50, image=0.63",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099936208657",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.527,
+      "temu_title": "Green LED Light Up Dinosaur Tyrannosaurus Rex Glowing Plush Animal Night Light Plush Toy Hug Soft Cute Gift For Kids Boys Girls Decoration Holiday Birthday Gift",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 16.49,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 51.4,
+        "embedding": 0.414,
+        "image": 0.635
+      },
+      "verdict": "Moderate match: fuzzy=51.4%, embedding=0.41, image=0.63",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601099859309286",
+      "amazon_id": "B0DFMWG9QR",
+      "confidence": 0.524,
+      "temu_title": "[New Electronic Toy Dog] 2025 New Electronic Toy Dog | Realistic Running And Barking, Interactive Fun, Cute Design, Perfect For Kids' Birthdays And Holidays, Enhances Motor Skills And Brings Joy For P",
+      "amazon_title": "Nuby Twist Ball Teether Activity Toy with Rattle and Fun Bright Colors - Montessori Sensory Toy Develops Fine Motor Skills - 3 + Months",
+      "temu_price": 5.88,
+      "amazon_price": 4.18,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 50.4,
+        "embedding": 0.435,
+        "image": 0.616
+      },
+      "verdict": "Moderate match: fuzzy=50.4%, embedding=0.43, image=0.62",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101450919978",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.519,
+      "temu_title": "2025 New Labrador Retriever - Cute And Cuddly Electric Toy That Walks, Twists And Barks, Companion Character For Children, Interactive Pet, Suitable For Christmas, Birthday Gifts For Girls And Boys",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 6.02,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 54.9,
+        "embedding": 0.448,
+        "image": 0.563
+      },
+      "verdict": "Moderate match: fuzzy=54.9%, embedding=0.45, image=0.56",
+      "needs_review": true,
+      "llm_processed": false
+    },
+    {
+      "temu_id": "601101181872425",
+      "amazon_id": "B0F436L3PH",
+      "confidence": 0.516,
+      "temu_title": "16\" LED Light-Up Musical Shark Stuffed Animal - Ocean Life Plush Toy with Built-In LED Light & Sound, Perfect for Youngsters' Playtime, Blue, Polyester Material, Anime-Themed Design, Musical Theme, Id",
+      "amazon_title": "hahaland Baby Toy for 6 + 12 18 Months \u2013 Crawling Musical Dancing Bouncing Learning Bee Plush, Interactive Tummy Time Toy for 1 2 3 Year Old Boys Girls Birthday Gifts",
+      "temu_price": 17.13,
+      "amazon_price": 21.99,
+      "match_method": "fuzzy+embedding+image",
+      "scores": {
+        "fuzzy": 49.1,
+        "embedding": 0.457,
+        "image": 0.584
+      },
+      "verdict": "Moderate match: fuzzy=49.1%, embedding=0.46, image=0.58",
+      "needs_review": true,
+      "llm_processed": false
+    }
+  ]
+}
