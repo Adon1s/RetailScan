@@ -4,7 +4,6 @@ Runs all scripts in the correct order and opens the dashboard
 """
 import subprocess
 import sys
-import os
 import time
 import webbrowser
 from pathlib import Path
@@ -21,10 +20,8 @@ class PipelineRunner:
         self.verbose = verbose
         self.use_http_server = use_http_server
         self.start_time = time.time()
-        # ensure logs directory exists
         self.log_dir = Path("pipeline_logs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        # log into pipeline_logs/
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = self.log_dir / f"pipeline_run_{timestamp}.log"
 
@@ -47,9 +44,9 @@ class PipelineRunner:
         try:
             # run the child process un-buffered; inherit our stdout/stderr
             result = subprocess.run(
-                [sys.executable, "-u", script_name],  # <- -u = unbuffered
-                check=False,  # don't raise on non-zero
-                timeout=timeout  # still honours any timeout
+                [sys.executable, "-u", script_name],
+                check=False,
+                timeout=timeout
             )
 
             if result.returncode != 0:
@@ -94,7 +91,6 @@ class PipelineRunner:
             self.log(f"Missing required scripts: {', '.join(missing)}", "ERROR")
             return False
 
-        # Check for dashboard
         if not Path("ProductMatchingDashboard.html").exists():
             self.log("Warning: ProductMatchingDashboard.html not found", "WARNING")
 
@@ -127,7 +123,6 @@ class PipelineRunner:
         if not self.skip_scraping:
             self.log("\n--- STEP 1 & 2: Web Scraping ---")
 
-            # Run scrapers
             if not self.run_script("TemuScraper.py", "Scraping Temu products"):
                 self.log("Temu scraping failed. Continue anyway? (y/n): ", "WARNING")
                 if input().lower() != 'y':
@@ -138,7 +133,6 @@ class PipelineRunner:
                 if input().lower() != 'y':
                     return False
 
-            # Check for CSV outputs
             self.check_output_files(["temu_baby_toys.csv", "amazon_baby_toys.csv"], "Scraping")
         else:
             self.log("\n--- Skipping scraping (using existing CSVs) ---")
@@ -152,7 +146,6 @@ class PipelineRunner:
         if not self.run_script("AmazonDataOrganizer.py", "Organizing Amazon data"):
             return False
 
-        # Check for JSON outputs
         if not self.check_output_files(
                 ["temu_products_for_analysis.json", "amazon_products_for_analysis.json"],
                 "Data organization"
@@ -284,7 +277,7 @@ class PipelineRunner:
     def show_summary(self):
         """Show summary of results"""
         try:
-            # Try to load enriched results first
+            # Try to load LLM analyzed results first
             results_file = "matching_results_llm.json"
             if not Path(results_file).exists():
                 results_file = "matching_results.json"
@@ -327,7 +320,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Handle single step execution
     if args.step:
         runner = PipelineRunner(verbose=not args.quiet)
 
@@ -343,11 +335,15 @@ def main():
             runner.run_script("ImageFinalPassLLM.py", "LLM enhancement")
         elif args.step == "dashboard":
             dashboard_path = Path("ProductMatchingDashboard.html").absolute()
-            if args.http_server:
-                runner.use_http_server = True
-                runner.serve_dashboard_with_http()
-            else:
-                webbrowser.open(f"file://{dashboard_path}")
+            # Always use HTTP server due to CORS issues
+            runner.use_http_server = True
+            runner.serve_dashboard_with_http()
+
+            # if args.http_server:  #Will uncomment out code later when file opening issue is fixed
+            #     runner.use_http_server = True
+            #     runner.serve_dashboard_with_http()
+            # else:
+            #     webbrowser.open(f"file://{dashboard_path}")
         elif args.step == "serve":
             # Run dedicated HTTP server
             runner.run_http_server(port=args.port)
@@ -361,7 +357,7 @@ def main():
             skip_scraping=args.skip_scraping,
             skip_llm=args.skip_llm,
             verbose=not args.quiet,
-            use_http_server=args.http_server
+            use_http_server=True
         )
         runner.run_pipeline()
 
