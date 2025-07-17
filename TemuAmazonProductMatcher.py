@@ -1,5 +1,5 @@
 """
-Temu-Amazon Product Matcher
+Temu-Amazon Product Matcher with Persistent Embedding Cache
 Matches products between Temu and Amazon using multiple similarity methods
 """
 import json
@@ -9,6 +9,8 @@ from typing import Dict, List, Tuple, Optional
 import numpy as np
 from dataclasses import dataclass
 from datetime import datetime
+import pickle
+import hashlib
 
 # Core matching libraries
 from rapidfuzz import fuzz, process
@@ -19,7 +21,7 @@ import requests
 from io import BytesIO
 import sys
 
-# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+# Force UTF-8 output so Windows console won't choke on ✓, ✗, etc.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -55,30 +57,142 @@ class MatchResult:
 
 
 class ProductMatcher:
-    def __init__(self, use_images: bool = True):
-        """Initialize the matcher with models"""
+    def __init__(self, use_images: bool = True, cache_dir: str = "embedding_cache"):
+        """Initialize the matcher with models and load cached embeddings"""
         print("Initializing ProductMatcher...")
+
+        # Create cache directory
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(exist_ok=True)
+
+        # Cache file paths
+        self.text_cache_file = self.cache_dir / "text_embeddings.pkl"
+        self.image_cache_file = self.cache_dir / "image_embeddings.pkl"
+        self.metadata_cache_file = self.cache_dir / "cache_metadata.json"
 
         # Sentence transformer for semantic matching
         self.sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.sentence_model_name = 'all-MiniLM-L6-v2'  # Store for cache validation
 
         # CLIP for image matching (if available and requested)
         print(f"  › use_images flag: {use_images}, CLIP_AVAILABLE: {CLIP_AVAILABLE}")
         self.use_images = use_images and CLIP_AVAILABLE
+        self.clip_model_name = "ViT-B/32"  # Store for cache validation
+
         if self.use_images:
             assert clip is not None  # Tell IDE that clip cannot be None here
-            self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device="cuda" if torch.cuda.is_available() else "cpu")
+            self.clip_model, self.clip_preprocess = clip.load(self.clip_model_name,
+                                                             device="cuda" if torch.cuda.is_available() else "cpu")
             print("CLIP model loaded for image matching")
 
-        # Cache for embeddings
-        self.title_embeddings_cache = {}
-        self.image_embeddings_cache = {}
+        # Load cached embeddings
+        self.title_embeddings_cache = self._load_text_cache()
+        self.image_embeddings_cache = self._load_image_cache()
+
+        # Track if we've added new embeddings that need saving
+        self.text_cache_dirty = False
+        self.image_cache_dirty = False
 
         # Updated thresholds for better matching
         self.FUZZY_IMMEDIATE_ACCEPT = 90  # Lowered from 93
         self.FUZZY_CANDIDATE_MIN = 40     # Lowered significantly from 85
         self.EMBEDDING_MIN = 0.70          # Lowered from 0.80
         self.IMAGE_MIN = 0.85              # Lowered from 0.88
+
+    def _get_cache_metadata(self):
+        """Get current cache metadata for validation"""
+        return {
+            "sentence_model": self.sentence_model_name,
+            "clip_model": self.clip_model_name if self.use_images else None,
+            "cache_version": "1.0"
+        }
+
+    def _validate_cache_metadata(self, stored_metadata):
+        """Check if cached embeddings are compatible with current models"""
+        current = self._get_cache_metadata()
+        return (stored_metadata.get("sentence_model") == current["sentence_model"] and
+                stored_metadata.get("clip_model") == current["clip_model"] and
+                stored_metadata.get("cache_version") == current["cache_version"])
+
+    def _load_text_cache(self):
+        """Load text embeddings from cache if valid"""
+        if not self.text_cache_file.exists():
+            print("  › No text embedding cache found, starting fresh")
+            return {}
+
+        try:
+            # Check metadata first
+            if self.metadata_cache_file.exists():
+                with open(self.metadata_cache_file, 'r') as f:
+                    metadata = json.load(f)
+                if not self._validate_cache_metadata(metadata):
+                    print("  › Text cache outdated (model changed), starting fresh")
+                    return {}
+
+            with open(self.text_cache_file, 'rb') as f:
+                cache = pickle.load(f)
+            print(f"  › Loaded {len(cache)} cached text embeddings")
+            return cache
+        except Exception as e:
+            print(f"  › Error loading text cache: {e}, starting fresh")
+            return {}
+
+    def _load_image_cache(self):
+        """Load image embeddings from cache if valid"""
+        if not self.use_images or not self.image_cache_file.exists():
+            return {}
+
+        try:
+            # Check metadata first
+            if self.metadata_cache_file.exists():
+                with open(self.metadata_cache_file, 'r') as f:
+                    metadata = json.load(f)
+                if not self._validate_cache_metadata(metadata):
+                    print("  › Image cache outdated (model changed), starting fresh")
+                    return {}
+
+            with open(self.image_cache_file, 'rb') as f:
+                cache = pickle.load(f)
+            print(f"  › Loaded {len(cache)} cached image embeddings")
+            return cache
+        except Exception as e:
+            print(f"  › Error loading image cache: {e}, starting fresh")
+            return {}
+
+    def _save_caches(self):
+        """Save any dirty caches to disk"""
+        if self.text_cache_dirty:
+            try:
+                with open(self.text_cache_file, 'wb') as f:
+                    pickle.dump(self.title_embeddings_cache, f)
+                print(f"  › Saved {len(self.title_embeddings_cache)} text embeddings to cache")
+                self.text_cache_dirty = False
+            except Exception as e:
+                print(f"  › Error saving text cache: {e}")
+
+        if self.image_cache_dirty and self.use_images:
+            try:
+                with open(self.image_cache_file, 'wb') as f:
+                    pickle.dump(self.image_embeddings_cache, f)
+                print(f"  › Saved {len(self.image_embeddings_cache)} image embeddings to cache")
+                self.image_cache_dirty = False
+            except Exception as e:
+                print(f"  › Error saving image cache: {e}")
+
+        # Save metadata
+        if self.text_cache_dirty or self.image_cache_dirty:
+            try:
+                with open(self.metadata_cache_file, 'w') as f:
+                    json.dump(self._get_cache_metadata(), f)
+            except Exception as e:
+                print(f"  › Error saving cache metadata: {e}")
+
+    def _get_text_cache_key(self, text: str) -> str:
+        """Generate a cache key for text"""
+        # Use cleaned text for consistency
+        cleaned = self.clean_title(text)
+        # Add a hash for safety (in case of very long titles)
+        return f"{cleaned[:100]}_{hashlib.md5(cleaned.encode()).hexdigest()[:8]}"
 
     def clean_title(self, title: str) -> str:
         """Clean and normalize product title"""
@@ -96,17 +210,30 @@ class ProductMatcher:
 
     def get_title_embedding(self, title: str) -> np.ndarray:
         """Get sentence embedding for title (cached)"""
-        if title not in self.title_embeddings_cache:
-            self.title_embeddings_cache[title] = self.sentence_model.encode(title)
-        return self.title_embeddings_cache[title]
+        cache_key = self._get_text_cache_key(title)
+
+        if cache_key not in self.title_embeddings_cache:
+            # Compute embedding
+            embedding = self.sentence_model.encode(title)
+            self.title_embeddings_cache[cache_key] = embedding
+            self.text_cache_dirty = True
+
+            # Save periodically (every 50 new embeddings)
+            if len(self.title_embeddings_cache) % 50 == 0:
+                self._save_caches()
+
+        return self.title_embeddings_cache[cache_key]
 
     def get_image_embedding(self, image_path_or_url: str) -> Optional[np.ndarray]:
         """Get CLIP embedding for image (cached)"""
         if not self.use_images:
             return None
 
-        if image_path_or_url in self.image_embeddings_cache:
-            return self.image_embeddings_cache[image_path_or_url]
+        # Use the full path/URL as cache key for images
+        cache_key = str(image_path_or_url)
+
+        if cache_key in self.image_embeddings_cache:
+            return self.image_embeddings_cache[cache_key]
 
         try:
             # Load image
@@ -126,7 +253,13 @@ class ProductMatcher:
                 embedding = embedding.cpu().numpy().flatten()
                 embedding = embedding / np.linalg.norm(embedding)  # Normalize
 
-            self.image_embeddings_cache[image_path_or_url] = embedding
+            self.image_embeddings_cache[cache_key] = embedding
+            self.image_cache_dirty = True
+
+            # Save periodically (every 20 new embeddings - images are more expensive)
+            if len(self.image_embeddings_cache) % 20 == 0:
+                self._save_caches()
+
             return embedding
 
         except Exception as e:
@@ -331,6 +464,9 @@ class ProductMatcher:
             )
             results.append(match)
 
+        # Save any remaining cached embeddings
+        self._save_caches()
+
         return results
 
     def _extract_products(self, data: Dict, source: str) -> List[Dict]:
@@ -375,7 +511,11 @@ class ProductMatcher:
                 "medium_confidence": len([r for r in results if 0.6 <= r.confidence < 0.8]),
                 "low_confidence": len([r for r in results if r.confidence < 0.6]),
                 "needs_review": len([r for r in results if r.needs_review]),
-                "use_images": self.use_images
+                "use_images": self.use_images,
+                "cache_stats": {
+                    "text_embeddings_cached": len(self.title_embeddings_cache),
+                    "image_embeddings_cached": len(self.image_embeddings_cache)
+                }
             },
             "matches": []
         }
@@ -412,6 +552,8 @@ class ProductMatcher:
         print(f"Medium confidence matches (0.6-0.8): {output['metadata']['medium_confidence']}")
         print(f"Low confidence matches (<0.6): {output['metadata']['low_confidence']}")
         print(f"Needs review: {output['metadata']['needs_review']}")
+        print(f"Embeddings cached - Text: {output['metadata']['cache_stats']['text_embeddings_cached']}, "
+              f"Images: {output['metadata']['cache_stats']['image_embeddings_cached']}")
 
     def generate_llm_review_batch(
             self,
@@ -458,6 +600,25 @@ class ProductMatcher:
             json.dump({"review_needed": review_items}, f, indent=2)
 
         print(f"\nGenerated {len(review_items)} items for LLM review in {output_file}")
+
+    def clear_cache(self, text_only=False, image_only=False):
+        """Clear embedding caches"""
+        if not text_only and not image_only:
+            # Clear both
+            self.title_embeddings_cache = {}
+            self.image_embeddings_cache = {}
+            print("Cleared all embedding caches")
+        elif text_only:
+            self.title_embeddings_cache = {}
+            print("Cleared text embedding cache")
+        elif image_only:
+            self.image_embeddings_cache = {}
+            print("Cleared image embedding cache")
+
+        # Mark as dirty to force save
+        self.text_cache_dirty = True
+        self.image_cache_dirty = True
+        self._save_caches()
 
 
 def main():
