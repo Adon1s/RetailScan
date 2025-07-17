@@ -1,7 +1,8 @@
 """
 Amazon scraper — Playwright stealth + persistent profile
-Outputs unified CSV schema that matches the (patched) Temu scraper.
+Outputs unified CSV schema that matches the (patched) Temu scraper.
 Schema: product_id,source,title,price,image_url,product_url
+Now with checkpoint saving after each page!
 """
 import asyncio
 import csv
@@ -9,12 +10,12 @@ import random
 import re
 from pathlib import Path
 from typing import Dict, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
-# ------------------------------------------^  alias chosen here
-# ── Config ────────────────────────────────────────────────────────────────────
+
 SEARCH_URL = "https://www.amazon.com/s?k=baby+toys&ref=nb_sb_noss"
 BASE_URL = "https://www.amazon.com"
 PROFILE_DIR = Path("amazon_profile")
@@ -26,15 +27,15 @@ UA_STRING = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 
-# Unified CSV header shared with Temu scraper
 FIELDNAMES = [
-    "product_id",  # ASIN for Amazon, numeric id for Temu
-    "source",      # "amazon" / "temu"
+    "product_id",
+    "source",
     "title",
-    "price",       # always two‑decimal string
+    "price",
     "image_url",
     "product_url",
 ]
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ def load_existing_ids(csv_file: Path) -> set:
             for row in reader:
                 existing_ids.add(row["product_id"])
     return existing_ids
+
 
 def save_to_csv(rows: List[Dict], csv_file: Path):
     if not rows:
@@ -60,10 +62,10 @@ def save_to_csv(rows: List[Dict], csv_file: Path):
         for r in rows:
             writer.writerow({
                 "product_id": r["product_id"],
-                "source":     r["source"],
-                "title":      r["title"].strip()[:200],
-                "price":      f"{float(r['price']):.2f}",
-                "image_url":  r.get("image_url", ""),
+                "source": r["source"],
+                "title": r["title"].strip()[:200],
+                "price": f"{float(r['price']):.2f}",
+                "image_url": r.get("image_url", ""),
                 "product_url": r["product_url"],
             })
 
@@ -90,6 +92,20 @@ def dl_image(row: Dict, dest: Path) -> None:
         file_path.write_bytes(r.content)
     except Exception as exc:
         print(f"✗ {row['product_id']} {exc}")
+
+
+async def download_images_batch(products: List[Dict], out_dir: Path, desc: str = ""):
+    """Download images for a batch of products"""
+    pics = [p for p in products if p["image_url"]]
+    if not pics:
+        return
+
+    print(f"\n🖼️  Downloading images{desc}...")
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        fut = [pool.submit(dl_image, p, out_dir) for p in pics]
+        for _ in tqdm(as_completed(fut), total=len(fut), unit="img"):
+            pass
+    print(f"✅ Downloaded images for {len(pics)} products{desc}")
 
 
 async def smooth_scroll(page, rounds: int = 15):
@@ -136,7 +152,8 @@ def extract_asin(url: str) -> str:
 async def extract(page) -> List[Dict]:
     await wait_for_images(page)
     products, seen = [], set()
-    containers = await page.query_selector_all('[data-component-type="s-search-result"], [data-asin]:not([data-asin=""])')
+    containers = await page.query_selector_all(
+        '[data-component-type="s-search-result"], [data-asin]:not([data-asin=""])')
     print(f"Found {len(containers)} potential containers")
 
     for c in containers:
@@ -199,6 +216,27 @@ async def handle_captcha(page):
         pass
 
 
+async def extract_and_save_checkpoint(page, page_number: int = 1):
+    """Extract products and save them immediately"""
+    print(f"\nExtracting products from page {page_number}...")
+    products = await extract(page)
+    print(f"Extracted {len(products)} products from page {page_number}")
+
+    # Filter for new products only
+    existing_ids = load_existing_ids(CSV_FILE)
+    new_products = [p for p in products if p["product_id"] not in existing_ids]
+
+    if new_products:
+        save_to_csv(new_products, CSV_FILE)
+
+        # Download images for new products
+        await download_images_batch(new_products, OUT_DIR, f" for page {page_number}")
+    else:
+        print(f"No new products found on page {page_number}")
+
+    return new_products
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 async def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -228,47 +266,47 @@ async def main():
         try:
             await page.wait_for_selector('[data-component-type="s-search-result"]', timeout=60_000)
         except PWTimeout:
-            print("Timeout: results didn’t load.")
+            print("Timeout: results didn't load.")
             return
         await asyncio.sleep(3)
         await smooth_scroll(page)
 
-        all_products, page_num = [], 1
-        while True:
-            print(f"Extracting page {page_num}…")
-            all_products += await extract(page)
+        all_new_products = []
+        page_num = 1
+
+        # Extract and save first page immediately
+        first_page_products = await extract_and_save_checkpoint(page, page_number=page_num)
+        all_new_products.extend(first_page_products)
+
+        # Continue with remaining pages
+        while page_num < max_pages:
             next_btn = await page.query_selector('a.s-pagination-next')
-            if not next_btn or page_num >= max_pages:
+            if not next_btn:
+                print("No more pages available")
                 break
+
             page_num += 1
-            async with page.expect_navigation(wait_until="domcontentloaded", timeout=60_000):
-                await next_btn.click()
+            print(f"\n{'=' * 60}")
+            print(f"Navigating to page {page_num}...")
+
+            try:
+                async with page.expect_navigation(wait_until="domcontentloaded", timeout=60_000):
+                    await next_btn.click()
+            except PWTimeout:
+                print(f"Timeout navigating to page {page_num}")
+                break
+
             await handle_captcha(page)
             await asyncio.sleep(random.uniform(2, 4))
             await smooth_scroll(page)
 
-        # dedupe within this run
-        unique = {p["product_id"]: p for p in all_products}.values()
-        print(f" Total unique products scraped: {len(unique)}")
+            # Extract and save this page immediately
+            page_products = await extract_and_save_checkpoint(page, page_number=page_num)
+            all_new_products.extend(page_products)
 
-        # Filter for new products only
-        existing_ids = load_existing_ids(CSV_FILE)
-        new_products = [p for p in unique if p["product_id"] not in existing_ids]
-
-        if new_products:
-            save_to_csv(new_products, CSV_FILE)
-
-            # images
-            print("\n🖼️  Downloading images…")
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            pics = [p for p in new_products if p["image_url"]]
-            with ThreadPoolExecutor(max_workers=8) as pool:
-                futures = [pool.submit(dl_image, p, OUT_DIR) for p in pics]
-                for _ in tqdm(as_completed(futures), total=len(futures), unit="img"):
-                    pass
-            print(f"✅ Images saved to {OUT_DIR}")
-        else:
-            print("No new products extracted.")
+        print(f"\n✓ Total scraped: {len(all_new_products)} new products across {page_num} pages")
+        print(f"✓ All data saved to: {CSV_FILE}")
+        print(f"✓ Images saved to: {OUT_DIR}/")
 
         print("\nDone — close the browser to finish.")
         await context.close()

@@ -1,19 +1,269 @@
 """
 Master Pipeline Script for Temu-Amazon Product Matching
 Runs all scripts in the correct order and opens the dashboard
+Enhanced with comprehensive incremental matching
 """
 import subprocess
 import sys
+import textwrap
 import time
 import webbrowser
 from pathlib import Path
 from datetime import datetime
 import json
 import argparse
+import hashlib
+from typing import Dict, List, Set, Tuple, Optional
+
+
+class IncrementalMatchingPipeline:
+    """Handles incremental matching logic and comparison tracking"""
+
+    def __init__(self, log_func=print):
+        self.log = log_func
+        self.comparison_history_file = Path("comparison_history.json")
+        self.product_hashes_file = Path("product_hashes.json")
+        self.matching_results_file = Path("matching_results.json")
+
+        # Load existing data
+        self.comparison_history = self._load_comparison_history()
+        self.product_hashes = self._load_product_hashes()
+        self.existing_matches = self._load_existing_matches()
+
+    def _load_comparison_history(self) -> Dict:
+        """Load history of all comparisons made"""
+        if self.comparison_history_file.exists():
+            try:
+                with open(self.comparison_history_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                # Validate structure
+                if "comparisons" in data and "metadata" in data:
+                    return data
+                else:
+                    self.log("Invalid comparison history format, starting fresh", "WARNING")
+            except json.JSONDecodeError as e:
+                self.log(f"Corrupted comparison history, starting fresh: {e}", "WARNING")
+
+        return {"comparisons": {}, "metadata": {"last_updated": None}}
+
+    def _load_product_hashes(self) -> Dict:
+        """Load hashes of products to detect changes"""
+        if self.product_hashes_file.exists():
+            try:
+                with open(self.product_hashes_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                self.log(f"Corrupted product hashes, starting fresh: {e}", "WARNING")
+        return {"temu": {}, "amazon": {}}
+
+    def _load_existing_matches(self) -> Dict:
+        """Load existing matching results"""
+        if self.matching_results_file.exists():
+            try:
+                with open(self.matching_results_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                self.log(f"Corrupted matching results, starting fresh: {e}", "WARNING")
+        return {"metadata": {}, "matches": []}
+
+    def _compute_product_hash(self, product: Dict, platform: str) -> str:
+        """Compute hash of product to detect changes"""
+        # Include key fields that would affect matching
+        if platform == "temu":
+            key_fields = f"{product.get('title', '')}{product.get('price', '')}"
+        else:  # amazon
+            key_fields = f"{product.get('title', '')}{product.get('price', '')}"
+
+        return hashlib.md5(key_fields.encode()).hexdigest()
+
+    def _get_comparison_key(self, temu_id: str, amazon_id: str) -> str:
+        """Generate unique key for a comparison"""
+        return f"{temu_id}_{amazon_id}"
+
+    def identify_products_to_match(self, temu_products: List[Dict], amazon_products: List[Dict]) -> Dict:
+        """Identify which products need matching"""
+        results = {
+            "new_temu": [],
+            "new_amazon": [],
+            "updated_temu": [],
+            "updated_amazon": [],
+            "temu_to_match": [],  # Final list of Temu products to match
+            "amazon_to_match": [],  # Final list of Amazon products to match
+            "skip_comparisons": set()  # Comparison keys to skip
+        }
+
+        # Check Temu products
+        for product in temu_products:
+            temu_id = product['temu_id']
+            current_hash = self._compute_product_hash(product, 'temu')
+
+            if temu_id not in self.product_hashes.get('temu', {}):
+                results['new_temu'].append(product)
+                results['temu_to_match'].append(product)
+            elif self.product_hashes['temu'][temu_id] != current_hash:
+                results['updated_temu'].append(product)
+                results['temu_to_match'].append(product)
+                # Clear comparison history for updated products
+                self._clear_comparisons_for_product(temu_id, 'temu')
+
+        # Check Amazon products
+        for product in amazon_products:
+            amazon_id = product['amazon_id']
+            current_hash = self._compute_product_hash(product, 'amazon')
+
+            if amazon_id not in self.product_hashes.get('amazon', {}):
+                results['new_amazon'].append(product)
+                results['amazon_to_match'].append(product)
+            elif self.product_hashes['amazon'][amazon_id] != current_hash:
+                results['updated_amazon'].append(product)
+                results['amazon_to_match'].append(product)
+                # Clear comparison history for updated products
+                self._clear_comparisons_for_product(amazon_id, 'amazon')
+
+        # If no new/updated products, use all for consistency
+        if not results['temu_to_match']:
+            results['temu_to_match'] = temu_products
+        if not results['amazon_to_match']:
+            results['amazon_to_match'] = amazon_products
+
+        # Identify comparisons to skip (already done and products unchanged)
+        for comp_key, comp_data in self.comparison_history.get('comparisons', {}).items():
+            temu_id, amazon_id = comp_key.split('_', 1)
+
+            # Skip if both products are unchanged
+            temu_unchanged = (temu_id in self.product_hashes.get('temu', {}) and
+                            temu_id not in [p['temu_id'] for p in results['temu_to_match']])
+            amazon_unchanged = (amazon_id in self.product_hashes.get('amazon', {}) and
+                              amazon_id not in [p['amazon_id'] for p in results['amazon_to_match']])
+
+            if temu_unchanged and amazon_unchanged:
+                results['skip_comparisons'].add(comp_key)
+
+        # Log summary
+        self.log(f"New Temu products: {len(results['new_temu'])}")
+        self.log(f"Updated Temu products: {len(results['updated_temu'])}")
+        self.log(f"New Amazon products: {len(results['new_amazon'])}")
+        self.log(f"Updated Amazon products: {len(results['updated_amazon'])}")
+        self.log(f"Comparisons to skip: {len(results['skip_comparisons'])}")
+
+        return results
+
+    def _clear_comparisons_for_product(self, product_id: str, platform: str):
+        """Clear comparison history for a specific product"""
+        comparisons = self.comparison_history.get('comparisons', {})
+        keys_to_remove = []
+
+        for comp_key in comparisons:
+            if platform == 'temu' and comp_key.startswith(f"{product_id}_"):
+                keys_to_remove.append(comp_key)
+            elif platform == 'amazon' and comp_key.endswith(f"_{product_id}"):
+                keys_to_remove.append(comp_key)
+
+        for key in keys_to_remove:
+            del comparisons[key]
+
+    def update_product_hashes(self, temu_products: List[Dict], amazon_products: List[Dict]):
+        """Update stored product hashes"""
+        # Update Temu hashes
+        for product in temu_products:
+            temu_id = product['temu_id']
+            self.product_hashes.setdefault('temu', {})[temu_id] = self._compute_product_hash(product, 'temu')
+
+        # Update Amazon hashes
+        for product in amazon_products:
+            amazon_id = product['amazon_id']
+            self.product_hashes.setdefault('amazon', {})[amazon_id] = self._compute_product_hash(product, 'amazon')
+
+        # Save updated hashes
+        with open(self.product_hashes_file, 'w', encoding='utf-8') as f:
+            json.dump(self.product_hashes, f, indent=2)
+
+    def filter_and_prepare_data(self, matching_info: Dict) -> Tuple[Dict, Dict]:
+        """Prepare filtered data for matching"""
+        # Create filtered data structures matching the original JSON format
+        filtered_temu = {
+            "all_products": matching_info['temu_to_match'],
+            "metadata": {"filtered": True, "total": len(matching_info['temu_to_match'])}
+        }
+
+        filtered_amazon = {
+            "all_products": matching_info['amazon_to_match'],
+            "metadata": {"filtered": True, "total": len(matching_info['amazon_to_match'])}
+        }
+
+        return filtered_temu, filtered_amazon
+
+    def save_comparison_history(self, new_comparisons: List[Dict]):
+        """Update comparison history with new comparisons"""
+        for match in new_comparisons:
+            comp_key = self._get_comparison_key(match['temu_id'], match['amazon_id'])
+
+            self.comparison_history['comparisons'][comp_key] = {
+                "date": datetime.now().isoformat(),
+                "confidence": match['confidence'],
+                "matched": match['confidence'] >= 0.6,  # Your threshold
+                "scores": match.get('scores', {})
+            }
+
+        self.comparison_history['metadata']['last_updated'] = datetime.now().isoformat()
+
+        with open(self.comparison_history_file, 'w', encoding='utf-8') as f:
+            json.dump(self.comparison_history, f, indent=2)
+
+    def merge_results(self, new_results: Dict) -> Dict:
+        """Merge new results with existing ones, handling deduplication"""
+        # Create a mapping of existing matches for deduplication
+        existing_pairs = {(m['temu_id'], m['amazon_id']): m for m in self.existing_matches.get('matches', [])}
+
+        # Process new matches
+        merged_matches = []
+        updated_count = 0
+        new_count = 0
+
+        for new_match in new_results.get('matches', []):
+            pair_key = (new_match['temu_id'], new_match['amazon_id'])
+
+            if pair_key in existing_pairs:
+                # Update existing match (might have new scores)
+                existing = existing_pairs[pair_key]
+                if existing['confidence'] != new_match['confidence']:
+                    merged_matches.append(new_match)
+                    updated_count += 1
+                else:
+                    merged_matches.append(existing)
+            else:
+                # New match
+                merged_matches.append(new_match)
+                new_count += 1
+                existing_pairs[pair_key] = new_match
+
+        # Add remaining existing matches that weren't updated
+        for pair_key, match in existing_pairs.items():
+            if not any(m['temu_id'] == pair_key[0] and m['amazon_id'] == pair_key[1] for m in merged_matches):
+                merged_matches.append(match)
+
+        # Sort by confidence
+        merged_matches.sort(key=lambda x: x['confidence'], reverse=True)
+
+        # Update metadata
+        metadata = new_results.get('metadata', {}).copy()
+        metadata.update({
+            'total_matches': len(merged_matches),
+            'high_confidence': len([m for m in merged_matches if m['confidence'] >= 0.8]),
+            'medium_confidence': len([m for m in merged_matches if 0.6 <= m['confidence'] < 0.8]),
+            'low_confidence': len([m for m in merged_matches if m['confidence'] < 0.6]),
+            'needs_review': len([m for m in merged_matches if m.get('needs_review', False)]),
+            'new_matches': new_count,
+            'updated_matches': updated_count,
+            'merge_timestamp': datetime.now().isoformat()
+        })
+
+        self.log(f"Merged results: {new_count} new, {updated_count} updated, {len(merged_matches)} total matches")
+
+        return {'metadata': metadata, 'matches': merged_matches}
 
 
 class PipelineRunner:
-
     def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=False):
         self.skip_scraping = skip_scraping
         self.skip_llm = skip_llm
@@ -24,6 +274,9 @@ class PipelineRunner:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = self.log_dir / f"pipeline_run_{timestamp}.log"
+
+        # Initialize incremental matching handler
+        self.incremental_matcher = IncrementalMatchingPipeline(log_func=self.log)
 
     def log(self, message, level="INFO"):
         """Log message to console and file"""
@@ -36,32 +289,98 @@ class PipelineRunner:
         with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
 
-    def run_script(self, script_name, description, timeout=None):
-        """Run a Python script and stream its output directly to the terminal"""
-        self.log(f"Starting: {description}")
-        self.log(f"Running: python {script_name}")
-
+    def run_script(self, script_name: str, description: str) -> bool:
+        """Run a Python script and capture output"""
+        self.log(f"Running: {description}")
         try:
-            # run the child process un-buffered; inherit our stdout/stderr
             result = subprocess.run(
-                [sys.executable, "-u", script_name],
-                check=False,
-                timeout=timeout
+                [sys.executable, script_name],
+                capture_output=True,
+                text=True,
+                encoding='utf-8'
             )
 
-            if result.returncode != 0:
-                self.log(f"{script_name} exited with code {result.returncode}", "ERROR")
+            if result.returncode == 0:
+                self.log(f"✓ {description} completed successfully")
+                if result.stderr and self.verbose:
+                    self.log(f"Script output (stderr): {result.stderr}")
+                return True
+            else:
+                self.log(f"✗ {description} failed with return code {result.returncode}", "ERROR")
+                if result.stderr:
+                    self.log(f"Error output: {result.stderr}", "ERROR")
                 return False
-
-            self.log(f"✓ Completed: {description}")
-            return True
-
-        except subprocess.TimeoutExpired:
-            self.log(f"Timeout running {script_name} after {timeout} seconds", "ERROR")
-            return False
         except Exception as e:
-            self.log(f"Exception running {script_name}: {e}", "ERROR")
+            self.log(f"✗ Failed to run {script_name}: {str(e)}", "ERROR")
             return False
+
+    def run_matcher_with_filtered_data(self, filtered_temu: Dict, filtered_amazon: Dict) -> bool:
+        """Run the matcher with pre-filtered data"""
+        # Save filtered data to temporary files
+        temp_temu = Path("temp_filtered_temu.json")
+        temp_amazon = Path("temp_filtered_amazon.json")
+        wrapper_file = Path("temp_matcher_wrapper.py")
+
+        try:
+            with open(temp_temu, 'w', encoding='utf-8') as f:
+                json.dump(filtered_temu, f, indent=2)
+
+            with open(temp_amazon, 'w', encoding='utf-8') as f:
+                json.dump(filtered_amazon, f, indent=2)
+
+            # Create a modified version of the matcher that uses these files
+            wrapper_code = textwrap.dedent(f'''
+                import sys
+                import json
+                from pathlib import Path
+
+                sys.path.insert(0, ".")
+
+                try:
+                    from TemuAmazonProductMatcher import ProductMatcher
+
+                    # Initialize matcher
+                    matcher = ProductMatcher(use_images=True)
+
+                    # Run matching with filtered files
+                    results = matcher.match_all_products(
+                        "{temp_temu}",
+                        "{temp_amazon}"
+                    )
+
+                    # Save results
+                    matcher.save_results(results, "temp_matching_results.json")
+
+                    print("Matching completed successfully")
+                    sys.exit(0)
+
+                except Exception as e:
+                    print(f"Error in matcher wrapper: {{e}}", file=sys.stderr)
+                    import traceback
+                    traceback.print_exc(file=sys.stderr)
+                    sys.exit(1)
+            ''')
+
+            with open(wrapper_file, 'w', encoding='utf-8') as f:
+                f.write(wrapper_code)
+
+            # Run the wrapper
+            success = self.run_script(str(wrapper_file), "Running filtered matching")
+
+            return success
+
+        except Exception as e:
+            self.log(f"Error in run_matcher_with_filtered_data: {e}", "ERROR")
+            return False
+
+        finally:
+            # Cleanup temp files (but NOT the results file - that's handled by caller)
+            for temp_file in [temp_temu, temp_amazon, wrapper_file]:
+                if temp_file.exists():
+                    try:
+                        temp_file.unlink()
+                    except Exception as e:
+                        self.log(f"Warning: Could not delete {temp_file}: {e}", "WARNING")
 
     def check_required_files(self):
         """Check if all required scripts exist"""
@@ -114,6 +433,15 @@ class PipelineRunner:
         self.log("Starting Temu-Amazon Product Matching Pipeline")
         self.log("=" * 60)
 
+        # Clean up any leftover temp files from previous failed runs
+        temp_results_file = Path("temp_matching_results.json")
+        if temp_results_file.exists():
+            self.log("Cleaning up leftover temp file from previous run")
+            try:
+                temp_results_file.unlink()
+            except Exception as e:
+                self.log(f"Warning: Could not clean up temp file: {e}", "WARNING")
+
         # Check required files
         if not self.check_required_files():
             self.log("Aborting: Missing required files", "ERROR")
@@ -152,11 +480,82 @@ class PipelineRunner:
         ):
             return False
 
-        # Step 5: Product Matching
-        self.log("\n--- STEP 5: Product Matching ---")
+        # Step 5: Incremental Product Matching
+        self.log("\n--- STEP 5: Incremental Product Matching ---")
 
-        if not self.run_script("TemuAmazonProductMatcher.py", "Matching products between platforms"):
+        # Load organized data
+        try:
+            with open("temu_products_for_analysis.json", 'r', encoding='utf-8') as f:
+                temu_data = json.load(f)
+            temu_products = temu_data.get('all_products', [])
+
+            with open("amazon_products_for_analysis.json", 'r', encoding='utf-8') as f:
+                amazon_data = json.load(f)
+            amazon_products = amazon_data.get('all_products', [])
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.log(f"Error loading product data: {e}", "ERROR")
             return False
+
+        # Identify what needs matching
+        matching_info = self.incremental_matcher.identify_products_to_match(temu_products, amazon_products)
+
+        # Check if any matching is needed
+        total_new = (len(matching_info['new_temu']) + len(matching_info['new_amazon']) +
+                     len(matching_info['updated_temu']) + len(matching_info['updated_amazon']))
+
+        if total_new == 0 and self.incremental_matcher.existing_matches.get('matches'):
+            self.log("No new or updated products found. Using existing matches.")
+            # Still update hashes for consistency
+            self.incremental_matcher.update_product_hashes(temu_products, amazon_products)
+        else:
+            # Prepare filtered data
+            filtered_temu, filtered_amazon = self.incremental_matcher.filter_and_prepare_data(matching_info)
+
+            try:
+                # Run matching on filtered data
+                if not self.run_matcher_with_filtered_data(filtered_temu, filtered_amazon):
+                    self.log("Matching failed", "ERROR")
+                    return False
+
+                # Verify temp file was created
+                if not temp_results_file.exists():
+                    self.log("Matching failed to create results file", "ERROR")
+                    return False
+
+                # Load new results
+                try:
+                    with open(temp_results_file, 'r', encoding='utf-8') as f:
+                        new_results = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError) as e:
+                    self.log(f"Error loading temp results: {e}", "ERROR")
+                    return False
+
+                # Update comparison history
+                self.incremental_matcher.save_comparison_history(new_results.get('matches', []))
+
+                # Merge with existing results
+                merged_results = self.incremental_matcher.merge_results(new_results)
+
+                # Save merged results
+                try:
+                    with open("matching_results.json", 'w', encoding='utf-8') as f:
+                        json.dump(merged_results, f, indent=2)
+                except Exception as e:
+                    self.log(f"Error saving merged results: {e}", "ERROR")
+                    return False
+
+                # Update product hashes
+                self.incremental_matcher.update_product_hashes(temu_products, amazon_products)
+
+                self.log("Incremental matching completed successfully")
+
+            finally:
+                # Always clean up temp file, even if something failed
+                if temp_results_file.exists():
+                    try:
+                        temp_results_file.unlink()
+                    except Exception as e:
+                        self.log(f"Warning: Could not delete temp results file: {e}", "WARNING")
 
         # Check for matching results
         if not self.check_output_files(["matching_results.json"], "Product matching"):
@@ -166,11 +565,22 @@ class PipelineRunner:
         if not self.skip_llm:
             self.log("\n--- STEP 6: LLM Enhancement ---")
 
-            # non-interactive: just run it
-            if not self.run_script(
-                    "ImageFinalPassLLM.py",
-                    "Running LLM re-ranking on top matches"):
-                self.log("LLM enhancement failed – continuing pipeline", "WARNING")
+            # Only run LLM on new/updated matches if needed
+            try:
+                with open("matching_results.json", 'r', encoding='utf-8') as f:
+                    current_results = json.load(f)
+
+                new_match_count = current_results.get('metadata', {}).get('new_matches', 0)
+                if new_match_count > 0:
+                    self.log(f"Running LLM analysis on {new_match_count} new matches")
+                    if not self.run_script(
+                            "ImageFinalPassLLM.py",
+                            "Running LLM re-ranking on matches"):
+                        self.log("LLM enhancement failed – continuing pipeline", "WARNING")
+                else:
+                        self.log("No new matches found—skipping LLM enhancement")
+            except Exception as e:
+                self.log(f"Error in LLM enhancement: {e}", "WARNING")
         else:
             self.log("\n--- Skipping LLM enhancement ---")
 
@@ -189,13 +599,17 @@ class PipelineRunner:
             # Default: Use file:// protocol (simpler and more reliable)
             file_url = dashboard_path.absolute().as_uri()
             self.log(f"Opening dashboard: {file_url}")
-            webbrowser.open(file_url)
 
-            # Show instructions for HTTP server if needed
-            self.log("\nDashboard opened in browser.")
-            self.log("If you see CORS errors or need HTTP features:")
-            self.log("  Run: python run_pipeline.py --step serve")
-            self.log("  Or: python -m http.server 8000")
+            try:
+                webbrowser.open(file_url)
+
+                # Show instructions for HTTP server if needed
+                self.log("\nDashboard opened in browser.")
+                self.log("If you see CORS errors or need HTTP features:")
+                self.log("  Run: python run_pipeline.py --step serve")
+                self.log("  Or: python -m http.server 8000")
+            except Exception as e:
+                self.log(f"Error opening dashboard: {e}", "ERROR")
 
         # Summary
         elapsed_time = time.time() - self.start_time
@@ -292,6 +706,12 @@ class PipelineRunner:
             self.log(f"Medium confidence (0.6-0.8): {metadata.get('medium_confidence', 0)}")
             self.log(f"Low confidence (<0.6): {metadata.get('low_confidence', 0)}")
 
+            # Show incremental stats if available
+            if 'new_matches' in metadata:
+                self.log(f"\nIncremental matching stats:")
+                self.log(f"  New matches: {metadata.get('new_matches', 0)}")
+                self.log(f"  Updated matches: {metadata.get('updated_matches', 0)}")
+
             if 'llm_enrichment' in metadata:
                 llm_data = metadata['llm_enrichment']
                 self.log(f"\nLLM Enhancement:")
@@ -317,8 +737,20 @@ def main():
                         help="Port for HTTP server (default: 8000)")
     parser.add_argument("--step", type=str,
                         help="Run only a specific step: scrape, organize, match, llm, dashboard, serve")
+    parser.add_argument("--clear-history", action="store_true",
+                        help="Clear comparison history and start fresh")
 
     args = parser.parse_args()
+
+    # Handle clearing history
+    if args.clear_history:
+        print("Clearing comparison history...")
+        for file in ["comparison_history.json", "product_hashes.json"]:
+            if Path(file).exists():
+                Path(file).unlink()
+                print(f"  Deleted {file}")
+        print("History cleared. Run pipeline again to start fresh.")
+        return
 
     if args.step:
         runner = PipelineRunner(verbose=not args.quiet)
@@ -335,15 +767,8 @@ def main():
             runner.run_script("ImageFinalPassLLM.py", "LLM enhancement")
         elif args.step == "dashboard":
             dashboard_path = Path("ProductMatchingDashboard.html").absolute()
-            # Always use HTTP server due to CORS issues
             runner.use_http_server = True
             runner.serve_dashboard_with_http()
-
-            # if args.http_server:  #Will uncomment out code later when file opening issue is fixed
-            #     runner.use_http_server = True
-            #     runner.serve_dashboard_with_http()
-            # else:
-            #     webbrowser.open(f"file://{dashboard_path}")
         elif args.step == "serve":
             # Run dedicated HTTP server
             runner.run_http_server(port=args.port)
