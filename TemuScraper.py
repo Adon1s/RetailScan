@@ -1,5 +1,6 @@
 """
 Debugged Temu scraper with improved scrolling and button detection
+Now with dynamic search terms and file naming
 """
 import asyncio
 import csv
@@ -7,16 +8,14 @@ import random
 import re
 from pathlib import Path
 from typing import Dict, List
+from urllib.parse import quote
 import requests
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SEARCH_URL = "https://www.temu.com/search_result.html?search_key=baby%20toys&search_method=user"
 BASE_URL = "https://www.temu.com"
 PROFILE_DIR = Path("temu_profile")
-OUT_DIR = Path("temu_baby_toys_imgs")
-CSV_FILE = Path("temu_baby_toys.csv")
 UA_STRING = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -34,6 +33,22 @@ FIELDNAMES = [
 ]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def create_search_url(search_terms: str) -> str:
+    """Create Temu search URL from user input"""
+    # URL encode the search terms (spaces become %20, special chars are encoded)
+    encoded_terms = quote(search_terms)
+    return f"https://www.temu.com/search_result.html?search_key={encoded_terms}&search_method=user"
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize string for use in filenames"""
+    # Replace spaces with underscores and remove special characters
+    sanitized = re.sub(r'[^\w\s-]', '', filename)
+    sanitized = re.sub(r'[-\s]+', '_', sanitized)
+    return sanitized.lower()
+
+
 def load_existing_ids(csv_file: Path) -> set:
     existing_ids = set()
     if csv_file.exists():
@@ -42,6 +57,7 @@ def load_existing_ids(csv_file: Path) -> set:
             for row in reader:
                 existing_ids.add(row["product_id"])
     return existing_ids
+
 
 def save_to_csv(rows: List[Dict], csv_file: Path):
     if not rows:
@@ -65,14 +81,17 @@ def save_to_csv(rows: List[Dict], csv_file: Path):
 
     print(f"📄 CSV updated → {csv_file} (added {len(rows)} new products)")
 
+
 def clean_title(text: str) -> str:
     text = re.sub(r"^Local\s*\n?", "", text, flags=re.I)
     text = re.sub(r"\s+", " ", text).replace("\n", " ").replace("\r", " ")
     return text.strip()[:200]
 
+
 def dl_image(row: Dict, dest: Path):
     dest.mkdir(exist_ok=True)
     file_path = dest / f"{row['product_id']}.jpg"
+
     if file_path.exists() or not row["image_url"]:
         return
 
@@ -82,6 +101,7 @@ def dl_image(row: Dict, dest: Path):
         file_path.write_bytes(r.content)
     except Exception as exc:
         print(f"✗ {row['product_id']} {exc}")
+
 
 async def check_for_popups(page):
     """Close any popups that might be blocking the page"""
@@ -105,6 +125,7 @@ async def check_for_popups(page):
         except:
             continue
     return False
+
 
 async def smooth_scroll_with_debug(page, max_rounds: int = 50):
     """Improved scrolling with better debugging"""
@@ -159,7 +180,6 @@ async def smooth_scroll_with_debug(page, max_rounds: int = 50):
 
         # Check for new content
         new_height = await page.evaluate("document.body.scrollHeight")
-
         if new_height == last_height:
             # Try scrolling up and down to trigger lazy loading
             print("  No new content, trying to trigger lazy loading...")
@@ -183,6 +203,7 @@ async def smooth_scroll_with_debug(page, max_rounds: int = 50):
             # Check for popups periodically
             await check_for_popups(page)
 
+
 async def find_and_click_see_more(page):
     """Button detection using Playwright's get_by_role for specificity"""
     print("\nLooking for 'See more' button...")
@@ -202,6 +223,7 @@ async def find_and_click_see_more(page):
         print(f"  Error finding/clicking button: {e}")
 
     return False
+
 
 async def load_more_pages(page, num_pages: int):
     """Improved pagination with better error handling"""
@@ -259,7 +281,6 @@ async def load_more_pages(page, num_pages: int):
 
             new_products = len(await page.query_selector_all("div[data-tooltip-title], div[class*='goods-item']"))
             print(f"✓ New products loaded: {new_products - current_products} added")
-
             loaded_pages += 1
 
         except PWTimeout:
@@ -272,6 +293,7 @@ async def load_more_pages(page, num_pages: int):
         await asyncio.sleep(delay)
 
     print(f"\n✓ Loaded {loaded_pages} pages total")
+
 
 async def wait_for_images(page, min_images: int = 20):
     """Wait for images with better error handling"""
@@ -292,9 +314,8 @@ async def wait_for_images(page, min_images: int = 20):
 
     await asyncio.sleep(2)
 
-# Keep the extract function and other helpers the same...
+
 async def extract(page):
-    # [Same as your original extract function]
     await wait_for_images(page, min_images=50)
     products, seen = [], set()
 
@@ -333,7 +354,7 @@ async def extract(page):
             if len(title) < 5:
                 t_el = await c.query_selector("[class*='title'], [class*='name'], h2, h3, div[class*='_1f1og7gq']")
                 title = (await t_el.inner_text()).strip() if t_el else ""
-            title = clean_title(title) or f"Temu Baby Toy {pid}"
+            title = clean_title(title) or f"Temu Product {pid}"
 
             # price
             price = 0.0
@@ -372,10 +393,29 @@ async def extract(page):
 
     return products
 
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 async def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
     print("Temu scraper starting…\n" + "=" * 60)
+
+    # Get search terms from user
+    search_terms = input("Enter search terms (e.g., 'baby toys', 'kitchen gadgets'): ").strip()
+    if not search_terms:
+        print("No search terms provided. Using default: 'baby toys'")
+        search_terms = "baby toys"
+
+    # Create dynamic paths based on search terms
+    search_slug = sanitize_filename(search_terms)
+    OUT_DIR = Path(f"temu_{search_slug}_imgs")
+    CSV_FILE = Path(f"temu_{search_slug}.csv")
+    SEARCH_URL = create_search_url(search_terms)
+
+    print(f"\nSearching for: {search_terms}")
+    print(f"CSV file: {CSV_FILE}")
+    print(f"Images directory: {OUT_DIR}")
+    print(f"Search URL: {SEARCH_URL}\n")
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     num_pages = int(input("How many pages of results to scrape? (1 or more): "))
 
@@ -388,7 +428,6 @@ async def main():
             user_agent=UA_STRING,
             locale="en-US",
         )
-
         page = await ctx.new_page()
         await page.route("**/*", lambda r: r.continue_())
 
@@ -435,6 +474,7 @@ async def main():
 
         print("\nClose the browser to finish.")
         await ctx.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -11,16 +11,14 @@ import re
 from pathlib import Path
 from typing import Dict, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import quote_plus
 
 import requests
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
-SEARCH_URL = "https://www.amazon.com/s?k=baby+toys&ref=nb_sb_noss"
 BASE_URL = "https://www.amazon.com"
 PROFILE_DIR = Path("amazon_profile")
-OUT_DIR = Path("amazon_baby_toys_imgs")
-CSV_FILE = Path("amazon_baby_toys.csv")
 UA_STRING = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -38,6 +36,21 @@ FIELDNAMES = [
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def create_search_url(search_terms: str) -> str:
+    """Create Amazon search URL from user input"""
+    # URL encode the search terms (spaces become +, special chars are encoded)
+    encoded_terms = quote_plus(search_terms)
+    return f"https://www.amazon.com/s?k={encoded_terms}&ref=nb_sb_noss"
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize string for use in filenames"""
+    # Replace spaces with underscores and remove special characters
+    sanitized = re.sub(r'[^\w\s-]', '', filename)
+    sanitized = re.sub(r'[-\s]+', '_', sanitized)
+    return sanitized.lower()
+
 
 def load_existing_ids(csv_file: Path) -> set:
     existing_ids = set()
@@ -216,21 +229,21 @@ async def handle_captcha(page):
         pass
 
 
-async def extract_and_save_checkpoint(page, page_number: int = 1):
+async def extract_and_save_checkpoint(page, csv_file: Path, out_dir: Path, page_number: int = 1):
     """Extract products and save them immediately"""
     print(f"\nExtracting products from page {page_number}...")
     products = await extract(page)
     print(f"Extracted {len(products)} products from page {page_number}")
 
     # Filter for new products only
-    existing_ids = load_existing_ids(CSV_FILE)
+    existing_ids = load_existing_ids(csv_file)
     new_products = [p for p in products if p["product_id"] not in existing_ids]
 
     if new_products:
-        save_to_csv(new_products, CSV_FILE)
+        save_to_csv(new_products, csv_file)
 
         # Download images for new products
-        await download_images_batch(new_products, OUT_DIR, f" for page {page_number}")
+        await download_images_batch(new_products, out_dir, f" for page {page_number}")
     else:
         print(f"No new products found on page {page_number}")
 
@@ -239,8 +252,26 @@ async def extract_and_save_checkpoint(page, page_number: int = 1):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 async def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
     print("Amazon scraper starting…\n" + "=" * 60)
+
+    # Get search terms from user
+    search_terms = input("Enter search terms (e.g., 'baby toys', 'wireless headphones'): ").strip()
+    if not search_terms:
+        print("No search terms provided. Using default: 'baby toys'")
+        search_terms = "baby toys"
+
+    # Create dynamic paths based on search terms
+    search_slug = sanitize_filename(search_terms)
+    OUT_DIR = Path(f"amazon_{search_slug}_imgs")
+    CSV_FILE = Path(f"amazon_{search_slug}.csv")
+    SEARCH_URL = create_search_url(search_terms)
+
+    print(f"\nSearching for: {search_terms}")
+    print(f"CSV file: {CSV_FILE}")
+    print(f"Images directory: {OUT_DIR}")
+    print(f"Search URL: {SEARCH_URL}\n")
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     max_pages = int(input("Enter the number of pages to scrape (default 3): ") or 3)
 
@@ -275,7 +306,7 @@ async def main():
         page_num = 1
 
         # Extract and save first page immediately
-        first_page_products = await extract_and_save_checkpoint(page, page_number=page_num)
+        first_page_products = await extract_and_save_checkpoint(page, CSV_FILE, OUT_DIR, page_number=page_num)
         all_new_products.extend(first_page_products)
 
         # Continue with remaining pages
@@ -301,7 +332,7 @@ async def main():
             await smooth_scroll(page)
 
             # Extract and save this page immediately
-            page_products = await extract_and_save_checkpoint(page, page_number=page_num)
+            page_products = await extract_and_save_checkpoint(page, CSV_FILE, OUT_DIR, page_number=page_num)
             all_new_products.extend(page_products)
 
         print(f"\n✓ Total scraped: {len(all_new_products)} new products across {page_num} pages")
