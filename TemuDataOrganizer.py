@@ -7,15 +7,53 @@ import json
 from pathlib import Path
 from datetime import datetime
 import sys
+from typing import Optional
 
-# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+# Force UTF-8 output so Windows console won't choke on ✓, ✗, etc.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# Configuration
-CSV_FILE = Path("temu_baby_toys.csv")
-IMAGES_DIR = Path("temu_baby_toys_imgs")
-OUTPUT_FILE = Path("temu_products_for_analysis.json")
+
+# ── CONFIG ──────────────────────────────────────────────────────────────
+def get_file_paths():
+    """Prompt user for file name and construct paths"""
+    print("Temu Data Analyzer for Resale")
+    print("="*50)
+
+    # Get the file name part from user
+    print("\nEnter the product category (e.g., 'baby_toys', 'montessori_toys'):")
+    print("This will look for files named 'temu_[your_input].csv'")
+
+    file_name = input("Category name: ").strip()
+
+    # Construct the paths
+    csv_file = Path(f"temu_{file_name}.csv")
+    images_dir = Path(f"temu_{file_name}_imgs")
+    output_file = Path(f"temu_{file_name}_analysis.json")
+
+    # Verify CSV file exists
+    if not csv_file.exists():
+        print(f"\n❌ Error: File '{csv_file}' not found!")
+        print(f"   Make sure you have a file named 'temu_{file_name}.csv' in this directory.")
+        sys.exit(1)
+
+    # Check if images directory exists (warning only)
+    if not images_dir.exists():
+        print(f"\n⚠️  Warning: Images directory '{images_dir}' not found.")
+        print("   Continuing without images...")
+
+    print(f"\n✓ Found CSV file: {csv_file}")
+    if images_dir.exists():
+        print(f"✓ Found images directory: {images_dir}")
+
+    return csv_file, images_dir, output_file, file_name.replace('_', ' ').title()
+
+
+# Global variables will be set by get_file_paths()
+CSV_FILE: Optional[Path] = None
+IMAGES_DIR: Optional[Path] = None
+OUTPUT_FILE: Optional[Path] = None
+SOURCE_NAME: Optional[str] = None
 
 
 def analyze_title_for_keywords(title):
@@ -26,14 +64,11 @@ def analyze_title_for_keywords(title):
         'organic', 'musical', 'interactive', 'sensory', 'stem', 'eco-friendly',
         'gift', 'premium', 'deluxe', 'set', 'bundle', 'complete'
     ]
-
     # Keywords that might indicate lower margins
     caution_keywords = [
         'batteries not included', 'simple', 'basic', 'small', 'mini'
     ]
-
     title_lower = title.lower()
-
     return {
         'high_value_keywords': [kw for kw in high_value_keywords if kw in title_lower],
         'caution_keywords': [kw for kw in caution_keywords if kw in title_lower],
@@ -62,7 +97,6 @@ def load_and_analyze_products():
 
     with open(CSV_FILE, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
-
         for row in reader:
             # Basic product info  ── accepts either old (`temu_id`) or new (`product_id`) header
             temu_id = row.get('temu_id') or row.get('product_id')
@@ -70,7 +104,7 @@ def load_and_analyze_products():
             price = float(row['price']) if row.get('price') else 0.0
 
             # Check if image exists locally
-            image_exists = (IMAGES_DIR / f"{temu_id}.jpg").exists()
+            image_exists = (IMAGES_DIR / f"{temu_id}.jpg").exists() if IMAGES_DIR.exists() else False
 
             # Analyze title for resale potential
             title_analysis = analyze_title_for_keywords(title)
@@ -82,7 +116,7 @@ def load_and_analyze_products():
                 'price': price,
                 'product_url': row['product_url'],
                 'has_image': image_exists,
-                'image_path': f"temu_baby_toys_imgs/{temu_id}.jpg" if image_exists else None,
+                'image_path': f"{IMAGES_DIR.name}/{temu_id}.jpg" if image_exists else None,
 
                 # Analysis fields for LLM
                 'price_category': categorize_price_range(price),
@@ -103,7 +137,6 @@ def load_and_analyze_products():
                     'image_available': image_exists
                 }
             }
-
             products_analysis.append(product)
 
     return products_analysis
@@ -132,7 +165,7 @@ def create_llm_analysis_file(products):
     # Final structure for LLM
     analysis_data = {
         'metadata': {
-            'source': 'Temu Baby Toys',
+            'source': f'Temu {SOURCE_NAME}',
             'analysis_date': datetime.now().isoformat(),
             'total_products': total_products,
             'products_with_images': products_with_images,
@@ -140,7 +173,6 @@ def create_llm_analysis_file(products):
             'price_distribution': price_distribution,
             'analysis_purpose': 'Purchasability assessment for resale'
         },
-
         'analysis_guidelines': {
             'good_resale_indicators': [
                 'Price between $10-50 (good margin potential)',
@@ -158,7 +190,6 @@ def create_llm_analysis_file(products):
                 'Items requiring batteries'
             ]
         },
-
         'top_prospects': {
             'by_keyword_density': [
                 {
@@ -171,7 +202,6 @@ def create_llm_analysis_file(products):
                 for p in products_by_value_keywords[:10]
             ]
         },
-
         'all_products': products
     }
 
@@ -184,18 +214,25 @@ def create_llm_analysis_file(products):
 
 def main():
     """Main function"""
-    print("Temu Data Analyzer for Resale")
-    print("=" * 50)
+    global CSV_FILE, IMAGES_DIR, OUTPUT_FILE, SOURCE_NAME
+
+    if CSV_FILE is None:  # Standalone mode: prompt for paths
+        CSV_FILE, IMAGES_DIR, OUTPUT_FILE, SOURCE_NAME = get_file_paths()
+    else:  # Pipeline mode: derive missing globals from CSV_FILE
+        # Extract slug from CSV_FILE (e.g., 'temu_baby_toys.csv' -> 'baby_toys')
+        file_stem = CSV_FILE.stem  # 'temu_baby_toys'
+        file_name = file_stem.replace('temu_', '', 1)  # 'baby_toys' (adjust for Amazon: replace 'amazon_' instead)
+        IMAGES_DIR = Path(f"temu_{file_name}_imgs")  # Or derive from OUTPUT_FILE if needed
+        SOURCE_NAME = file_name.replace('_', ' ').title()  # 'Baby Toys'
 
     # Load and analyze products
-    print("Loading and analyzing products...")
+    print("\nLoading and analyzing products...")
     products = load_and_analyze_products()
     print(f"✓ Analyzed {len(products)} products")
 
     # Create LLM analysis file
     print("\nCreating LLM analysis file...")
     analysis_data = create_llm_analysis_file(products)
-
     print(f"\n✓ Analysis file saved to: {OUTPUT_FILE}")
 
     # Quick summary
@@ -213,7 +250,7 @@ def main():
         print(f"\n{i}. {product['title']}")
         print(f"   {product['quick_assessment']}")
 
-    print("\n💡 Feed 'temu_products_for_analysis.json' to your LLM for detailed purchasability analysis")
+    print(f"\n💡 Feed '{OUTPUT_FILE.name}' to your LLM for detailed purchasability analysis")
 
 
 if __name__ == "__main__":

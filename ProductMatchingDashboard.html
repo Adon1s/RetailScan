@@ -579,452 +579,484 @@
         </div>
     </div>
 
-    <script>
-        // State management
-        let matches = [];
-        let filteredMatches = [];
-        let decisions = {}; // Store user decisions
-        let currentSort = 'confidence-desc';
-        let currentFilter = {
-            confidence: 'all',
-            minConfidence: 0,
-            search: ''
-        };
+ <script>
+    // Sanitize function to match the pipeline's logic
+    function sanitizeFilename(filename) {
+        // Remove special characters except alphanumeric, spaces, underscores, and hyphens
+        let sanitized = filename.replace(/[^\w\s_-]/g, '');
+        // Replace spaces and hyphens with underscores
+        sanitized = sanitized.replace(/[-\s]+/g, '_');
+        return sanitized.toLowerCase();
+    }
 
-        // Initialize dashboard
-        async function init() {
-            try {
-                // Try to load enriched results first, fall back to original
-                let response = await fetch('matching_results_enriched.json');
-                if (!response.ok) {
-                    console.log('Enriched results not found, loading original...');
-                    response = await fetch('matching_results.json');
-                }
-                const data = await response.json();
+    // State management
+    let matches = [];
+    let filteredMatches = [];
+    let decisions = {}; // Store user decisions
+    let currentSort = 'confidence-desc';
+    let currentFilter = {
+        confidence: 'all',
+        minConfidence: 0,
+        search: ''
+    };
+    let CATEGORY_NAME = ''; // Store the original category name
+    let CATEGORY_SLUG = ''; // Store the sanitized category name for file paths
 
-                // Handle both formats: array directly or object with matches property
-                if (Array.isArray(data)) {
-                    matches = data;
-                } else if (data.matches && Array.isArray(data.matches)) {
-                    matches = data.matches;
-                } else {
-                    matches = [];
-                }
+    // Initialize dashboard
+    async function init() {
+        // Prompt for category name
+        const userInput = prompt(
+            "Enter the product category (e.g., 'baby toys' or 'baby_toys'):\n" +
+            "This will load files named:\n" +
+            "- matching_results_[category].json or\n" +
+            "- matching_results_enriched_[category].json"
+        );
 
-                console.log(`Loaded ${matches.length} matches`);
+        if (!userInput) {
+            document.getElementById('match-grid').innerHTML =
+                '<div class="empty-state">No category entered. Please refresh the page and enter a category name.</div>';
+            return;
+        }
 
-                // Check if we have LLM data
-                if (matches.some(m => m.llm_processed)) {
-                    document.body.classList.add('has-llm-data');
-                }
+        // Store both original and sanitized versions
+        CATEGORY_NAME = userInput.trim();
+        CATEGORY_SLUG = sanitizeFilename(CATEGORY_NAME);
 
-                // Load saved decisions from localStorage
-                const saved = localStorage.getItem('matchDecisions');
-                if (saved) {
-                    decisions = JSON.parse(saved);
-                }
+        console.log(`Original input: "${CATEGORY_NAME}", Sanitized: "${CATEGORY_SLUG}"`);
 
-                updateStats();
-                applyFilters();
-                renderMatches();
-            } catch (error) {
-                console.error('Error loading matches:', error);
-                document.getElementById('match-grid').innerHTML =
-                    '<div class="empty-state">Error loading matching results. Please ensure matching_results.json is in the same directory.</div>';
+        try {
+            // Try to load enriched results first, fall back to original
+            let response = await fetch(`matching_results_enriched_${CATEGORY_SLUG}.json`);
+            if (!response.ok) {
+                console.log('Enriched results not found, loading original...');
+                response = await fetch(`matching_results_${CATEGORY_SLUG}.json`);
+            }
+            const data = await response.json();
+
+            // Handle both formats: array directly or object with matches property
+            if (Array.isArray(data)) {
+                matches = data;
+            } else if (data.matches && Array.isArray(data.matches)) {
+                matches = data.matches;
+            } else {
+                matches = [];
             }
 
-            // Setup event listeners
-            setupEventListeners();
+            console.log(`Loaded ${matches.length} matches for category: ${CATEGORY_NAME} (using files with slug: ${CATEGORY_SLUG})`);
+
+            // Check if we have LLM data
+            if (matches.some(m => m.llm_processed)) {
+                document.body.classList.add('has-llm-data');
+            }
+
+            // Load saved decisions from localStorage (use sanitized slug for consistency)
+            const saved = localStorage.getItem(`matchDecisions_${CATEGORY_SLUG}`);
+            if (saved) {
+                decisions = JSON.parse(saved);
+            }
+
+            updateStats();
+            applyFilters();
+            renderMatches();
+        } catch (error) {
+            console.error('Error loading matches:', error);
+            document.getElementById('match-grid').innerHTML =
+                `<div class="empty-state">Error loading matching results for category '${CATEGORY_NAME}'. Please ensure matching_results_${CATEGORY_SLUG}.json is in the same directory.</div>`;
         }
 
         // Setup event listeners
-        function setupEventListeners() {
-            document.getElementById('sort-select').addEventListener('change', (e) => {
-                currentSort = e.target.value;
-                applyFilters();
-                renderMatches();
-            });
+        setupEventListeners();
+    }
 
-            document.getElementById('filter-confidence').addEventListener('change', (e) => {
-                currentFilter.confidence = e.target.value;
-                applyFilters();
-                renderMatches();
-            });
+    // Setup event listeners
+    function setupEventListeners() {
+        document.getElementById('sort-select').addEventListener('change', (e) => {
+            currentSort = e.target.value;
+            applyFilters();
+            renderMatches();
+        });
 
-            document.getElementById('min-confidence').addEventListener('input', (e) => {
-                currentFilter.minConfidence = parseFloat(e.target.value) || 0;
-                applyFilters();
-                renderMatches();
-            });
+        document.getElementById('filter-confidence').addEventListener('change', (e) => {
+            currentFilter.confidence = e.target.value;
+            applyFilters();
+            renderMatches();
+        });
 
-            document.getElementById('search-input').addEventListener('input', (e) => {
-                currentFilter.search = e.target.value.toLowerCase();
-                applyFilters();
-                renderMatches();
-            });
+        document.getElementById('min-confidence').addEventListener('input', (e) => {
+            currentFilter.minConfidence = parseFloat(e.target.value) || 0;
+            applyFilters();
+            renderMatches();
+        });
 
-            document.getElementById('export-approved').addEventListener('click', exportApproved);
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            currentFilter.search = e.target.value.toLowerCase();
+            applyFilters();
+            renderMatches();
+        });
+
+        document.getElementById('export-approved').addEventListener('click', exportApproved);
+    }
+
+    // Update statistics
+    function updateStats() {
+        const highConf = matches.filter(m => m.confidence >= 0.8).length;
+        const mediumConf = matches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8).length;
+        const needsReview = matches.filter(m => m.needs_review).length;
+
+        // Calculate average price difference
+        let totalDiff = 0;
+        let count = 0;
+        matches.forEach(m => {
+            const temuPrice = m.temu_price || m.price || 0;
+            const amazonPrice = m.amazon_price || 0;
+            if (temuPrice && amazonPrice) {
+                totalDiff += Math.abs(amazonPrice - temuPrice);
+                count++;
+            }
+        });
+        const avgDiff = count > 0 ? totalDiff / count : 0;
+
+        document.getElementById('total-matches').textContent = matches.length;
+        document.getElementById('high-confidence').textContent = highConf;
+        document.getElementById('medium-confidence').textContent = mediumConf;
+        document.getElementById('needs-review').textContent = needsReview;
+        document.getElementById('avg-price-diff').textContent = `$${avgDiff.toFixed(2)}`;
+
+        // Update LLM stats if available
+        const llmProcessed = matches.filter(m => m.llm_processed).length;
+        if (llmProcessed > 0) {
+            const llmSame = matches.filter(m => m.llm_same_product).length;
+            const llmDifferent = matches.filter(m => m.llm_processed && !m.llm_same_product).length;
+
+            document.getElementById('llm-processed').textContent = llmProcessed;
+            document.getElementById('llm-same').textContent = llmSame;
+            document.getElementById('llm-different').textContent = llmDifferent;
         }
 
-        // Update statistics
-        function updateStats() {
-            const highConf = matches.filter(m => m.confidence >= 0.8).length;
-            const mediumConf = matches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8).length;
-            const needsReview = matches.filter(m => m.needs_review).length;
+        // Update export stats
+        updateExportStats();
+    }
 
-            // Calculate average price difference
-            let totalDiff = 0;
-            let count = 0;
-            matches.forEach(m => {
-                const temuPrice = m.temu_price || m.price || 0;
-                const amazonPrice = m.amazon_price || 0;
-                if (temuPrice && amazonPrice) {
-                    totalDiff += Math.abs(amazonPrice - temuPrice);
-                    count++;
-                }
-            });
-            const avgDiff = count > 0 ? totalDiff / count : 0;
-
-            document.getElementById('total-matches').textContent = matches.length;
-            document.getElementById('high-confidence').textContent = highConf;
-            document.getElementById('medium-confidence').textContent = mediumConf;
-            document.getElementById('needs-review').textContent = needsReview;
-            document.getElementById('avg-price-diff').textContent = `$${avgDiff.toFixed(2)}`;
-
-            // Update LLM stats if available
-            const llmProcessed = matches.filter(m => m.llm_processed).length;
-            if (llmProcessed > 0) {
-                const llmSame = matches.filter(m => m.llm_same_product).length;
-                const llmDifferent = matches.filter(m => m.llm_processed && !m.llm_same_product).length;
-
-                document.getElementById('llm-processed').textContent = llmProcessed;
-                document.getElementById('llm-same').textContent = llmSame;
-                document.getElementById('llm-different').textContent = llmDifferent;
-            }
-
-            // Update export stats
-            updateExportStats();
+    // Get LLM badge HTML
+    function getLLMBadge(match) {
+        if (!match.llm_processed) {
+            return '<span class="llm-badge llm-pending">⏳ LLM Pending</span>';
         }
 
-        // Get LLM badge HTML
-        function getLLMBadge(match) {
-            if (!match.llm_processed) {
-                return '<span class="llm-badge llm-pending">⏳ LLM Pending</span>';
-            }
+        const rationale = match.llm_rationale || 'No rationale provided';
 
-            const rationale = match.llm_rationale || 'No rationale provided';
+        if (match.llm_same_product) {
+            return `<span class="llm-badge llm-same" title="${rationale}">
+                        ✓ LLM: Same Product
+                        <div class="llm-rationale">${rationale}</div>
+                    </span>`;
+        } else {
+            return `<span class="llm-badge llm-different" title="${rationale}">
+                        ✗ LLM: Different
+                        <div class="llm-rationale">${rationale}</div>
+                    </span>`;
+        }
+    }
 
-            if (match.llm_same_product) {
-                return `<span class="llm-badge llm-same" title="${rationale}">
-                            ✓ LLM: Same Product
-                            <div class="llm-rationale">${rationale}</div>
-                        </span>`;
-            } else {
-                return `<span class="llm-badge llm-different" title="${rationale}">
-                            ✗ LLM: Different
-                            <div class="llm-rationale">${rationale}</div>
-                        </span>`;
+    // Apply filters and sorting
+    function applyFilters() {
+        filteredMatches = [...matches];
+
+        // Apply confidence filter
+        if (currentFilter.confidence !== 'all') {
+            if (currentFilter.confidence === 'high') {
+                filteredMatches = filteredMatches.filter(m => m.confidence >= 0.8);
+            } else if (currentFilter.confidence === 'medium') {
+                filteredMatches = filteredMatches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8);
+            } else if (currentFilter.confidence === 'low') {
+                filteredMatches = filteredMatches.filter(m => m.confidence < 0.6);
+            } else if (currentFilter.confidence === 'needs-review') {
+                filteredMatches = filteredMatches.filter(m => m.needs_review);
+            } else if (currentFilter.confidence === 'llm-same') {
+                filteredMatches = filteredMatches.filter(m => m.llm_processed && m.llm_same_product);
+            } else if (currentFilter.confidence === 'llm-different') {
+                filteredMatches = filteredMatches.filter(m => m.llm_processed && !m.llm_same_product);
+            } else if (currentFilter.confidence === 'llm-pending') {
+                filteredMatches = filteredMatches.filter(m => !m.llm_processed);
             }
         }
 
-        // Apply filters and sorting
-        function applyFilters() {
-            filteredMatches = [...matches];
+        // Apply minimum confidence filter
+        filteredMatches = filteredMatches.filter(m => m.confidence >= currentFilter.minConfidence);
 
-            // Apply confidence filter
-            if (currentFilter.confidence !== 'all') {
-                if (currentFilter.confidence === 'high') {
-                    filteredMatches = filteredMatches.filter(m => m.confidence >= 0.8);
-                } else if (currentFilter.confidence === 'medium') {
-                    filteredMatches = filteredMatches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8);
-                } else if (currentFilter.confidence === 'low') {
-                    filteredMatches = filteredMatches.filter(m => m.confidence < 0.6);
-                } else if (currentFilter.confidence === 'needs-review') {
-                    filteredMatches = filteredMatches.filter(m => m.needs_review);
-                } else if (currentFilter.confidence === 'llm-same') {
-                    filteredMatches = filteredMatches.filter(m => m.llm_processed && m.llm_same_product);
-                } else if (currentFilter.confidence === 'llm-different') {
-                    filteredMatches = filteredMatches.filter(m => m.llm_processed && !m.llm_same_product);
-                } else if (currentFilter.confidence === 'llm-pending') {
-                    filteredMatches = filteredMatches.filter(m => !m.llm_processed);
-                }
-            }
-
-            // Apply minimum confidence filter
-            filteredMatches = filteredMatches.filter(m => m.confidence >= currentFilter.minConfidence);
-
-            // Apply search filter
-            if (currentFilter.search) {
-                filteredMatches = filteredMatches.filter(m => {
-                    const searchStr = currentFilter.search;
-                    return (
-                        m.temu_id.toLowerCase().includes(searchStr) ||
-                        m.amazon_id.toLowerCase().includes(searchStr) ||
-                        (m.temu_title && m.temu_title.toLowerCase().includes(searchStr)) ||
-                        (m.amazon_title && m.amazon_title.toLowerCase().includes(searchStr))
-                    );
-                });
-            }
-
-            // Apply sorting
-            filteredMatches.sort((a, b) => {
-                switch (currentSort) {
-                    case 'confidence-desc':
-                        return b.confidence - a.confidence;
-                    case 'confidence-asc':
-                        return a.confidence - b.confidence;
-                    case 'price-diff-desc':
-                        const bDiffDesc = Math.abs((b.amazon_price || 0) - (b.temu_price || b.price || 0));
-                        const aDiffDesc = Math.abs((a.amazon_price || 0) - (a.temu_price || a.price || 0));
-                        return bDiffDesc - aDiffDesc;
-                    case 'price-diff-asc':
-                        const aDiffAsc = Math.abs((a.amazon_price || 0) - (a.temu_price || a.price || 0));
-                        const bDiffAsc = Math.abs((b.amazon_price || 0) - (b.temu_price || b.price || 0));
-                        return aDiffAsc - bDiffAsc;
-                    case 'image-score':
-                        return (b.scores?.image || 0) - (a.scores?.image || 0);
-                    case 'text-score':
-                        return (b.scores?.embedding || 0) - (a.scores?.embedding || 0);
-                    case 'llm-verdict':
-                        // Sort by LLM verdict: Different first, then Same, then not processed
-                        const aScore = a.llm_processed ? (a.llm_same_product ? 2 : 0) : 1;
-                        const bScore = b.llm_processed ? (b.llm_same_product ? 2 : 0) : 1;
-                        return aScore - bScore;
-                    default:
-                        return 0;
-                }
+        // Apply search filter
+        if (currentFilter.search) {
+            filteredMatches = filteredMatches.filter(m => {
+                const searchStr = currentFilter.search;
+                return (
+                    m.temu_id.toLowerCase().includes(searchStr) ||
+                    m.amazon_id.toLowerCase().includes(searchStr) ||
+                    (m.temu_title && m.temu_title.toLowerCase().includes(searchStr)) ||
+                    (m.amazon_title && m.amazon_title.toLowerCase().includes(searchStr))
+                );
             });
         }
 
-        // Get confidence class
-        function getConfidenceClass(confidence) {
-            if (confidence >= 0.8) return 'confidence-high';
-            if (confidence >= 0.6) return 'confidence-medium';
-            return 'confidence-low';
+        // Apply sorting
+        filteredMatches.sort((a, b) => {
+            switch (currentSort) {
+                case 'confidence-desc':
+                    return b.confidence - a.confidence;
+                case 'confidence-asc':
+                    return a.confidence - b.confidence;
+                case 'price-diff-desc':
+                    const bDiffDesc = Math.abs((b.amazon_price || 0) - (b.temu_price || b.price || 0));
+                    const aDiffDesc = Math.abs((a.amazon_price || 0) - (a.temu_price || a.price || 0));
+                    return bDiffDesc - aDiffDesc;
+                case 'price-diff-asc':
+                    const aDiffAsc = Math.abs((a.amazon_price || 0) - (a.temu_price || a.price || 0));
+                    const bDiffAsc = Math.abs((b.amazon_price || 0) - (b.temu_price || b.price || 0));
+                    return aDiffAsc - bDiffAsc;
+                case 'image-score':
+                    return (b.scores?.image || 0) - (a.scores?.image || 0);
+                case 'text-score':
+                    return (b.scores?.embedding || 0) - (a.scores?.embedding || 0);
+                case 'llm-verdict':
+                    // Sort by LLM verdict: Different first, then Same, then not processed
+                    const aScore = a.llm_processed ? (a.llm_same_product ? 2 : 0) : 1;
+                    const bScore = b.llm_processed ? (b.llm_same_product ? 2 : 0) : 1;
+                    return aScore - bScore;
+                default:
+                    return 0;
+            }
+        });
+    }
+
+    // Get confidence class
+    function getConfidenceClass(confidence) {
+        if (confidence >= 0.8) return 'confidence-high';
+        if (confidence >= 0.6) return 'confidence-medium';
+        return 'confidence-low';
+    }
+
+    // Render matches
+    function renderMatches() {
+        const grid = document.getElementById('match-grid');
+
+        if (filteredMatches.length === 0) {
+            grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
+            return;
         }
 
-        // Render matches
-        function renderMatches() {
-            const grid = document.getElementById('match-grid');
+        grid.innerHTML = filteredMatches.map(match => {
+            const confClass = getConfidenceClass(match.confidence);
+            const matchKey = `${match.temu_id}_${match.amazon_id}`;
+            const decision = decisions[matchKey];
+            const temuPrice = match.temu_price || match.price || 0;
+            const amazonPrice = match.amazon_price || 0;
+            const priceDiff = amazonPrice - temuPrice;
+            const priceDiffPercent = temuPrice ? ((priceDiff / temuPrice) * 100).toFixed(0) : 0;
 
-            if (filteredMatches.length === 0) {
-                grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
-                return;
-            }
-
-            grid.innerHTML = filteredMatches.map(match => {
-                const confClass = getConfidenceClass(match.confidence);
-                const matchKey = `${match.temu_id}_${match.amazon_id}`;
-                const decision = decisions[matchKey];
-                const temuPrice = match.temu_price || match.price || 0;
-                const amazonPrice = match.amazon_price || 0;
-                const priceDiff = amazonPrice - temuPrice;
-                const priceDiffPercent = temuPrice ? ((priceDiff / temuPrice) * 100).toFixed(0) : 0;
-
-                return `
-                    <div class="match-card ${confClass}" data-match-key="${matchKey}">
-                        <div class="match-header">
-                            <div class="header-left">
-                                <span class="confidence-badge">
-                                    ${Math.min(match.confidence * 100, 100).toFixed(1)}% Confidence
-                                </span>
-                                ${getLLMBadge(match)}
-                                <span style="font-size: 12px; color: #666;">
-                                    ${match.match_method || 'Combined Match'}
-                                </span>
-                            </div>
-                            <div style="font-size: 12px; color: #666;">
-                                ${decision ? `Decision: ${decision}` : 'Pending Review'}
-                            </div>
+            return `
+                <div class="match-card ${confClass}" data-match-key="${matchKey}">
+                    <div class="match-header">
+                        <div class="header-left">
+                            <span class="confidence-badge">
+                                ${Math.min(match.confidence * 100, 100).toFixed(1)}% Confidence
+                            </span>
+                            ${getLLMBadge(match)}
+                            <span style="font-size: 12px; color: #666;">
+                                ${match.match_method || 'Combined Match'}
+                            </span>
                         </div>
-
-                        <div class="match-content">
-                            <!-- Temu Product -->
-                            <div class="product-section">
-                                <div class="product-image">
-                                    <span class="platform-badge temu-badge">TEMU</span>
-                                    <span class="price-tag">$${temuPrice.toFixed(2)}</span>
-                                    <img src="./temu_baby_toys_imgs/${match.temu_id}.jpg"
-                                         alt="${match.temu_title || 'Temu Product'}"
-                                         onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
-                                </div>
-                                <div class="product-title">${match.temu_title || `Temu Product ${match.temu_id}`}</div>
-                                <div class="product-id">ID: ${match.temu_id}</div>
-                                <a href="https://www.temu.com/search_result.html?search_key=${match.temu_id}" target="_blank" style="font-size: 12px; color: #667eea;">Search on Temu →</a>
-                            </div>
-
-                            <!-- Match Scores -->
-                            <div class="match-scores">
-                                ${match.scores ? `
-                                    <div class="score-item">
-                                        <div class="score-label">Text Match</div>
-                                        <div class="score-bar">
-                                            <div class="score-fill" style="width: ${Math.min(match.scores.fuzzy || 0, 100)}%"></div>
-                                        </div>
-                                        <div class="score-value">${Math.min(match.scores.fuzzy || 0, 100).toFixed(1)}%</div>
-                                    </div>
-                                    <div class="score-item">
-                                        <div class="score-label">Semantic</div>
-                                        <div class="score-bar">
-                                            <div class="score-fill" style="width: ${Math.min((match.scores.embedding || 0) * 100, 100)}%"></div>
-                                        </div>
-                                        <div class="score-value">${Math.min((match.scores.embedding || 0) * 100, 100).toFixed(1)}%</div>
-                                    </div>
-                                    <div class="score-item">
-                                        <div class="score-label">Image</div>
-                                        <div class="score-bar">
-                                            <div class="score-fill" style="width: ${Math.min((match.scores.image || 0) * 100, 100)}%"></div>
-                                        </div>
-                                        <div class="score-value">${Math.min((match.scores.image || 0) * 100, 100).toFixed(1)}%</div>
-                                    </div>
-                                ` : `
-                                    <div class="score-value" style="font-size: 16px;">
-                                        ${Math.min(match.confidence * 100, 100).toFixed(1)}%
-                                    </div>
-                                    <div style="font-size: 12px; color: #666;">Overall Match</div>
-                                `}
-
-                                ${match.llm_processed && match.llm_image_similarity !== undefined ? `
-                                    <div class="llm-score-section">
-                                        <div class="score-item">
-                                            <div class="score-label">LLM Image Sim</div>
-                                            <div class="score-bar">
-                                                <div class="score-fill" style="width: ${Math.min(match.llm_image_similarity * 100, 100)}%; background: #8b5cf6;"></div>
-                                            </div>
-                                            <div class="score-value">${Math.min(match.llm_image_similarity * 100, 100).toFixed(1)}%</div>
-                                        </div>
-                                    </div>
-                                ` : ''}
-
-                                <div class="price-diff ${priceDiff < 0 ? 'negative' : ''}">
-                                    Price Diff: ${priceDiff >= 0 ? '+' : ''}$${priceDiff.toFixed(2)}
-                                    <br>
-                                    <small>(${priceDiffPercent >= 0 ? '+' : ''}${priceDiffPercent}%)</small>
-                                </div>
-                            </div>
-
-                            <!-- Amazon Product -->
-                            <div class="product-section">
-                                <div class="product-image">
-                                    <span class="platform-badge amazon-badge">AMAZON</span>
-                                    <span class="price-tag">$${amazonPrice.toFixed(2)}</span>
-                                    <img src="./amazon_baby_toys_imgs/${match.amazon_id}.jpg"
-                                         alt="${match.amazon_title || 'Amazon Product'}"
-                                         onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
-                                </div>
-                                <div class="product-title">${match.amazon_title || `Amazon Product ${match.amazon_id}`}</div>
-                                <div class="product-id">ASIN: ${match.amazon_id}</div>
-                                <a href="https://www.amazon.com/dp/${match.amazon_id}" target="_blank" style="font-size: 12px; color: #667eea;">View on Amazon →</a>
-                            </div>
-                        </div>
-
-                        <div class="match-actions">
-                            <button class="btn-approve" onclick="setDecision('${matchKey}', 'approved')">
-                                ✓ Approve Match
-                            </button>
-                            <button class="btn-uncertain" onclick="setDecision('${matchKey}', 'uncertain')">
-                                ? Uncertain
-                            </button>
-                            <button class="btn-reject" onclick="setDecision('${matchKey}', 'rejected')">
-                                ✗ Reject Match
-                            </button>
+                        <div style="font-size: 12px; color: #666;">
+                            ${decision ? `Decision: ${decision}` : 'Pending Review'}
                         </div>
                     </div>
-                `;
-            }).join('');
+
+                    <div class="match-content">
+                        <!-- Temu Product -->
+                        <div class="product-section">
+                            <div class="product-image">
+                                <span class="platform-badge temu-badge">TEMU</span>
+                                <span class="price-tag">$${temuPrice.toFixed(2)}</span>
+                                <img src="./temu_${CATEGORY_SLUG}_imgs/${match.temu_id}.jpg"
+                                     alt="${match.temu_title || 'Temu Product'}"
+                                     onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
+                            </div>
+                            <div class="product-title">${match.temu_title || `Temu Product ${match.temu_id}`}</div>
+                            <div class="product-id">ID: ${match.temu_id}</div>
+                            <a href="https://www.temu.com/search_result.html?search_key=${match.temu_id}" target="_blank" style="font-size: 12px; color: #667eea;">Search on Temu →</a>
+                        </div>
+
+                        <!-- Match Scores -->
+                        <div class="match-scores">
+                            ${match.scores ? `
+                                <div class="score-item">
+                                    <div class="score-label">Text Match</div>
+                                    <div class="score-bar">
+                                        <div class="score-fill" style="width: ${Math.min(match.scores.fuzzy || 0, 100)}%"></div>
+                                    </div>
+                                    <div class="score-value">${Math.min(match.scores.fuzzy || 0, 100).toFixed(1)}%</div>
+                                </div>
+                                <div class="score-item">
+                                    <div class="score-label">Semantic</div>
+                                    <div class="score-bar">
+                                        <div class="score-fill" style="width: ${Math.min((match.scores.embedding || 0) * 100, 100)}%"></div>
+                                    </div>
+                                    <div class="score-value">${Math.min((match.scores.embedding || 0) * 100, 100).toFixed(1)}%</div>
+                                </div>
+                                <div class="score-item">
+                                    <div class="score-label">Image</div>
+                                    <div class="score-bar">
+                                        <div class="score-fill" style="width: ${Math.min((match.scores.image || 0) * 100, 100)}%"></div>
+                                    </div>
+                                    <div class="score-value">${Math.min((match.scores.image || 0) * 100, 100).toFixed(1)}%</div>
+                                </div>
+                            ` : `
+                                <div class="score-value" style="font-size: 16px;">
+                                    ${Math.min(match.confidence * 100, 100).toFixed(1)}%
+                                </div>
+                                <div style="font-size: 12px; color: #666;">Overall Match</div>
+                            `}
+
+                            ${match.llm_processed && match.llm_image_similarity !== undefined ? `
+                                <div class="llm-score-section">
+                                    <div class="score-item">
+                                        <div class="score-label">LLM Image Sim</div>
+                                        <div class="score-bar">
+                                            <div class="score-fill" style="width: ${Math.min(match.llm_image_similarity * 100, 100)}%; background: #8b5cf6;"></div>
+                                        </div>
+                                        <div class="score-value">${Math.min(match.llm_image_similarity * 100, 100).toFixed(1)}%</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="price-diff ${priceDiff < 0 ? 'negative' : ''}">
+                                Price Diff: ${priceDiff >= 0 ? '+' : ''}$${priceDiff.toFixed(2)}
+                                <br>
+                                <small>(${priceDiffPercent >= 0 ? '+' : ''}${priceDiffPercent}%)</small>
+                            </div>
+                        </div>
+
+                        <!-- Amazon Product -->
+                        <div class="product-section">
+                            <div class="product-image">
+                                <span class="platform-badge amazon-badge">AMAZON</span>
+                                <span class="price-tag">$${amazonPrice.toFixed(2)}</span>
+                                <img src="./amazon_${CATEGORY_SLUG}_imgs/${match.amazon_id}.jpg"
+                                     alt="${match.amazon_title || 'Amazon Product'}"
+                                     onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
+                            </div>
+                            <div class="product-title">${match.amazon_title || `Amazon Product ${match.amazon_id}`}</div>
+                            <div class="product-id">ASIN: ${match.amazon_id}</div>
+                            <a href="https://www.amazon.com/dp/${match.amazon_id}" target="_blank" style="font-size: 12px; color: #667eea;">View on Amazon →</a>
+                        </div>
+                    </div>
+
+                    <div class="match-actions">
+                        <button class="btn-approve" onclick="setDecision('${matchKey}', 'approved')">
+                            ✓ Approve Match
+                        </button>
+                        <button class="btn-uncertain" onclick="setDecision('${matchKey}', 'uncertain')">
+                            ? Uncertain
+                        </button>
+                        <button class="btn-reject" onclick="setDecision('${matchKey}', 'rejected')">
+                            ✗ Reject Match
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Set decision for a match
+    function setDecision(matchKey, decision) {
+        decisions[matchKey] = decision;
+        // Use sanitized slug for localStorage key for consistency
+        localStorage.setItem(`matchDecisions_${CATEGORY_SLUG}`, JSON.stringify(decisions));
+
+        // Update the card UI
+        const card = document.querySelector(`[data-match-key="${matchKey}"]`);
+        if (card) {
+            const header = card.querySelector('.match-header > div:last-child');
+            header.textContent = `Decision: ${decision}`;
         }
 
-        // Set decision for a match
-        function setDecision(matchKey, decision) {
-            decisions[matchKey] = decision;
-            localStorage.setItem('matchDecisions', JSON.stringify(decisions));
+        updateExportStats();
+    }
 
-            // Update the card UI
-            const card = document.querySelector(`[data-match-key="${matchKey}"]`);
-            if (card) {
-                const header = card.querySelector('.match-header > div:last-child');
-                header.textContent = `Decision: ${decision}`;
-            }
+    // Update export statistics
+    function updateExportStats() {
+        const approved = Object.values(decisions).filter(d => d === 'approved').length;
+        const rejected = Object.values(decisions).filter(d => d === 'rejected').length;
+        const uncertain = Object.values(decisions).filter(d => d === 'uncertain').length;
 
-            updateExportStats();
+        document.getElementById('approved-count').textContent = approved;
+        document.getElementById('rejected-count').textContent = rejected;
+        document.getElementById('uncertain-count').textContent = uncertain;
+
+        // Show export section if there are decisions
+        document.getElementById('export-section').style.display =
+            (approved + rejected + uncertain) > 0 ? 'block' : 'none';
+    }
+
+    // Export approved matches
+    function exportApproved() {
+        const approved = matches.filter(m => {
+            const matchKey = `${m.temu_id}_${m.amazon_id}`;
+            return decisions[matchKey] === 'approved';
+        });
+
+        if (approved.length === 0) {
+            alert('No approved matches to export. Please approve some matches first.');
+            return;
         }
 
-        // Update export statistics
-        function updateExportStats() {
-            const approved = Object.values(decisions).filter(d => d === 'approved').length;
-            const rejected = Object.values(decisions).filter(d => d === 'rejected').length;
-            const uncertain = Object.values(decisions).filter(d => d === 'uncertain').length;
+        // Create CSV content
+        const headers = ['temu_id', 'amazon_id', 'confidence', 'temu_price', 'amazon_price', 'price_difference', 'match_method', 'llm_verdict', 'llm_rationale', 'temu_title', 'amazon_title'];
+        const rows = approved.map(m => [
+            m.temu_id,
+            m.amazon_id,
+            m.confidence.toFixed(3),
+            (m.temu_price || m.price || 0).toFixed(2),
+            (m.amazon_price || 0).toFixed(2),
+            ((m.amazon_price || 0) - (m.temu_price || m.price || 0)).toFixed(2),
+            m.match_method || 'combined',
+            m.llm_processed ? (m.llm_same_product ? 'same' : 'different') : 'not_processed',
+            m.llm_rationale ? `"${m.llm_rationale.replace(/"/g, '""')}"` : '',
+            `"${(m.temu_title || '').replace(/"/g, '""')}"`,
+            `"${(m.amazon_title || '').replace(/"/g, '""')}"`
+        ]);
 
-            document.getElementById('approved-count').textContent = approved;
-            document.getElementById('rejected-count').textContent = rejected;
-            document.getElementById('uncertain-count').textContent = uncertain;
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
 
-            // Show export section if there are decisions
-            document.getElementById('export-section').style.display =
-                (approved + rejected + uncertain) > 0 ? 'block' : 'none';
-        }
+        // Download CSV
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `approved_matches_${CATEGORY_SLUG}_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
 
-        // Export approved matches
-        function exportApproved() {
-            const approved = matches.filter(m => {
-                const matchKey = `${m.temu_id}_${m.amazon_id}`;
-                return decisions[matchKey] === 'approved';
-            });
+    // Download all results with decisions
+    function downloadResults() {
+        const results = matches.map(m => {
+            const matchKey = `${m.temu_id}_${m.amazon_id}`;
+            return {
+                ...m,
+                decision: decisions[matchKey] || 'pending'
+            };
+        });
 
-            if (approved.length === 0) {
-                alert('No approved matches to export. Please approve some matches first.');
-                return;
-            }
+        const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `match_decisions_${CATEGORY_SLUG}_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
 
-            // Create CSV content
-            const headers = ['temu_id', 'amazon_id', 'confidence', 'temu_price', 'amazon_price', 'price_difference', 'match_method', 'llm_verdict', 'llm_rationale', 'temu_title', 'amazon_title'];
-            const rows = approved.map(m => [
-                m.temu_id,
-                m.amazon_id,
-                m.confidence.toFixed(3),
-                (m.temu_price || m.price || 0).toFixed(2),
-                (m.amazon_price || 0).toFixed(2),
-                ((m.amazon_price || 0) - (m.temu_price || m.price || 0)).toFixed(2),
-                m.match_method || 'combined',
-                m.llm_processed ? (m.llm_same_product ? 'same' : 'different') : 'not_processed',
-                m.llm_rationale ? `"${m.llm_rationale.replace(/"/g, '""')}"` : '',
-                `"${(m.temu_title || '').replace(/"/g, '""')}"`,
-                `"${(m.amazon_title || '').replace(/"/g, '""')}"`
-            ]);
-
-            const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-
-            // Download CSV
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `approved_matches_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        // Download all results with decisions
-        function downloadResults() {
-            const results = matches.map(m => {
-                const matchKey = `${m.temu_id}_${m.amazon_id}`;
-                return {
-                    ...m,
-                    decision: decisions[matchKey] || 'pending'
-                };
-            });
-
-            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `match_decisions_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        // Initialize on load
-        window.addEventListener('DOMContentLoaded', init);
-    </script>
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', init);
+</script>
 </body>
 </html>
