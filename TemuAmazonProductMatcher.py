@@ -627,30 +627,57 @@ def main():
     print("Temu-Amazon Product Matcher")
     print("=" * 50)
 
+    # Get the file name part from user
+    print("\nEnter the product category (e.g., 'baby_toys', 'montessori_toys'):")
+    print("This will look for analysis files named:")
+    print("  - temu_[category]_analysis.json")
+    print("  - amazon_[category]_analysis.json")
+
+    category_name = input("Category name: ").strip()
+
+    # Construct file paths
+    temu_file = Path(f"temu_{category_name}_analysis.json")
+    amazon_file = Path(f"amazon_{category_name}_analysis.json")
+    temu_img_dir = f"temu_{category_name}_imgs"
+    amazon_img_dir = f"amazon_{category_name}_imgs"
+
+    # Check files exist
+    if not temu_file.exists():
+        print(f"\n❌ Error: {temu_file} not found!")
+        print(f"   Make sure you've run the Temu data organizer for '{category_name}' first.")
+        return
+
+    if not amazon_file.exists():
+        print(f"\n❌ Error: {amazon_file} not found!")
+        print(f"   Make sure you've run the Amazon data organizer for '{category_name}' first.")
+        return
+
+    # Check image directories (warning only)
+    if not Path(temu_img_dir).exists():
+        print(f"\n⚠️  Warning: Temu images directory '{temu_img_dir}' not found.")
+    if not Path(amazon_img_dir).exists():
+        print(f"\n⚠️  Warning: Amazon images directory '{amazon_img_dir}' not found.")
+
+    print(f"\n✓ Found Temu file: {temu_file}")
+    print(f"✓ Found Amazon file: {amazon_file}")
+
     # Ask about image matching
-    #use_images = input("\nUse image matching? (requires CLIP, y/n): ").lower() == 'y'
+    # use_images = input("\nUse image matching? (requires CLIP, y/n): ").lower() == 'y'
 
     matcher = ProductMatcher(use_images=True)  # skip the prompt
 
-    # File paths
-    temu_file = "temu_products_for_analysis.json"
-    amazon_file = "amazon_products_for_analysis.json"
-
-    # Check files exist
-    if not Path(temu_file).exists():
-        print(f"Error: {temu_file} not found!")
-        return
-
-    if not Path(amazon_file).exists():
-        print(f"Error: {amazon_file} not found!")
-        return
-
     # Run matching
     print("\nStarting product matching...")
-    results = matcher.match_all_products(temu_file, amazon_file)
+    results = matcher.match_all_products(
+        str(temu_file),
+        str(amazon_file),
+        temu_img_dir=temu_img_dir,
+        amazon_img_dir=amazon_img_dir
+    )
 
-    # Save results
-    matcher.save_results(results)
+    # Save results with category-specific filename
+    output_file = f"matching_results_{category_name}.json"
+    matcher.save_results(results, output_file)
 
     # Generate LLM review batch if needed
     review_needed = sum(1 for r in results if r.needs_review)
@@ -663,7 +690,8 @@ def main():
         with open(amazon_file, 'r', encoding='utf-8') as f:
             amazon_full = matcher._extract_products(json.load(f), 'amazon')
 
-        matcher.generate_llm_review_batch(results, temu_full, amazon_full)
+        review_file = f"llm_review_batch_{category_name}.json"
+        matcher.generate_llm_review_batch(results, temu_full, amazon_full, review_file)
 
     print("\nMatching complete!")
 

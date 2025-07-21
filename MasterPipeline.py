@@ -1,11 +1,12 @@
 """
 Master Pipeline Script for Temu-Amazon Product Matching
 Runs all scripts in the correct order and opens the dashboard
-Enhanced with comprehensive incremental matching
+Enhanced with comprehensive incremental matching and dynamic search terms
 """
 import subprocess
 import sys
 import textwrap
+import threading
 import time
 import webbrowser
 from pathlib import Path
@@ -13,7 +14,23 @@ from datetime import datetime
 import json
 import argparse
 import hashlib
+import re
 from typing import Dict, List, Set, Tuple, Optional
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize string for use in filenames (matches scraper logic)"""
+    sanitized = re.sub(r'[^\w\s-]', '', filename)
+    sanitized = re.sub(r'[-\s]+', '_', sanitized)
+    return sanitized.lower()
+
+
+def normalize_search_terms(search_terms: str) -> str:
+    """Normalize search terms for display/searching (convert underscores to spaces)"""
+    # First sanitize to remove special chars, then convert underscores back to spaces
+    cleaned = re.sub(r'[^\w\s_-]', '', search_terms.strip())
+    normalized = re.sub(r'[_-]+', ' ', cleaned)
+    return ' '.join(normalized.split())  # Normalize multiple spaces to single space
 
 
 class IncrementalMatchingPipeline:
@@ -132,9 +149,9 @@ class IncrementalMatchingPipeline:
 
             # Skip if both products are unchanged
             temu_unchanged = (temu_id in self.product_hashes.get('temu', {}) and
-                            temu_id not in [p['temu_id'] for p in results['temu_to_match']])
+                              temu_id not in [p['temu_id'] for p in results['temu_to_match']])
             amazon_unchanged = (amazon_id in self.product_hashes.get('amazon', {}) and
-                              amazon_id not in [p['amazon_id'] for p in results['amazon_to_match']])
+                                amazon_id not in [p['amazon_id'] for p in results['amazon_to_match']])
 
             if temu_unchanged and amazon_unchanged:
                 results['skip_comparisons'].add(comp_key)
@@ -264,11 +281,23 @@ class IncrementalMatchingPipeline:
 
 
 class PipelineRunner:
-    def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=False):
+    def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=False, search_terms=None):
         self.skip_scraping = skip_scraping
         self.skip_llm = skip_llm
         self.verbose = verbose
         self.use_http_server = use_http_server
+
+        # Normalize search terms - convert underscores to spaces for display/search
+        self.search_terms = normalize_search_terms(search_terms or "baby toys")
+        # Create sanitized slug for filenames (always uses underscores)
+        self.search_slug = sanitize_filename(self.search_terms)
+
+        # Dynamic file paths based on search terms
+        self.temu_csv = Path(f"temu_{self.search_slug}.csv")
+        self.amazon_csv = Path(f"amazon_{self.search_slug}.csv")
+        self.temu_json = Path(f"temu_{self.search_slug}_analysis.json")  # Changed to match standalone
+        self.amazon_json = Path(f"amazon_{self.search_slug}_analysis.json")
+
         self.start_time = time.time()
         self.log_dir = Path("pipeline_logs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -277,6 +306,23 @@ class PipelineRunner:
 
         # Initialize incremental matching handler
         self.incremental_matcher = IncrementalMatchingPipeline(log_func=self.log)
+
+        # Save config for other scripts to use
+        self.save_pipeline_config()
+
+    def save_pipeline_config(self):
+        """Save pipeline configuration for other scripts"""
+        config = {
+            "search_terms": self.search_terms,  # Normalized version with spaces
+            "search_slug": self.search_slug,     # Sanitized version with underscores
+            "temu_csv": str(self.temu_csv),
+            "amazon_csv": str(self.amazon_csv),
+            "temu_json": str(self.temu_json),
+            "amazon_json": str(self.amazon_json)
+        }
+        with open("pipeline_config.json", 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2)
+        self.log(f"Saved pipeline config with search terms: '{self.search_terms}'")
 
     def log(self, message, level="INFO"):
         """Log message to console and file"""
@@ -289,30 +335,272 @@ class PipelineRunner:
         with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
 
-    def run_script(self, script_name: str, description: str) -> bool:
-        """Run a Python script and capture output"""
+    def run_script(self, script_name: str, description: str, input_text: str = None) -> bool:
+        """Run a Python script with real-time streaming output"""
         self.log(f"Running: {description}")
         try:
-            result = subprocess.run(
-                [sys.executable, script_name],
-                capture_output=True,
+            # Prepare command
+            cmd = [sys.executable, script_name]
+
+            # Start subprocess with pipes for streaming
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.PIPE if input_text else None,
                 text=True,
-                encoding='utf-8'
+                encoding='utf-8',
+                errors='replace'  # Handle any encoding issues gracefully
             )
 
-            if result.returncode == 0:
+            # Provide input if needed
+            if input_text:
+                process.stdin.write(input_text)
+                process.stdin.close()
+
+            # Stream output in real-time (non-blocking)
+            def stream_output(pipe, level="INFO"):
+                """Helper to stream from a pipe"""
+                for line in iter(pipe.readline, ''):
+                    line = line.strip()
+                    if line:
+                        print(line)  # Print to console immediately
+                        self.log(line, level)  # Also log it
+
+            # Start threads for streaming stdout and stderr
+            stdout_thread = threading.Thread(target=stream_output, args=(process.stdout, "INFO"))
+            stderr_thread = threading.Thread(target=stream_output, args=(process.stderr, "ERROR"))
+
+            stdout_thread.start()
+            stderr_thread.start()
+
+            # Wait for process to finish
+            process.wait()
+
+            # Join threads
+            stdout_thread.join()
+            stderr_thread.join()
+
+            if process.returncode == 0:
                 self.log(f"✓ {description} completed successfully")
-                if result.stderr and self.verbose:
-                    self.log(f"Script output (stderr): {result.stderr}")
                 return True
             else:
-                self.log(f"✗ {description} failed with return code {result.returncode}", "ERROR")
-                if result.stderr:
-                    self.log(f"Error output: {result.stderr}", "ERROR")
+                self.log(f"✗ {description} failed with return code {process.returncode}", "ERROR")
                 return False
+
         except Exception as e:
             self.log(f"✗ Failed to run {script_name}: {str(e)}", "ERROR")
             return False
+
+    def run_scraper_with_config(self, scraper_script: str, platform: str, num_pages: int = 1) -> bool:
+        """Run scraper with predefined inputs"""
+        # Create wrapper script that provides inputs automatically
+        wrapper_file = Path(f"temp_{platform}_scraper_wrapper.py")
+
+        wrapper_code = textwrap.dedent(f'''
+            import subprocess
+            import sys
+            
+            # Prepare inputs for the scraper (use normalized search terms with spaces)
+            inputs = "{self.search_terms}\\n{num_pages}\\n"
+            
+            # Run the actual scraper with inputs
+            result = subprocess.run(
+                [sys.executable, "{scraper_script}"],
+                input=inputs,
+                text=True,
+                capture_output=True,
+                encoding='utf-8'
+            )
+            
+            # Forward the output
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr)
+            
+            # Exit with same code
+            sys.exit(result.returncode)
+        ''')
+
+        try:
+            with open(wrapper_file, 'w', encoding='utf-8') as f:
+                f.write(wrapper_code)
+
+            success = self.run_script(str(wrapper_file), f"Scraping {platform} products")
+            return success
+
+        finally:
+            if wrapper_file.exists():
+                wrapper_file.unlink()
+
+    def run_scrapers_parallel(self, num_pages: int = 1) -> Tuple[bool, bool]:
+        """Run both scrapers in parallel"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
+
+        # Thread-safe result storage
+        results = {'temu': False, 'amazon': False}
+        results_lock = threading.Lock()
+
+        def run_scraper_thread(platform: str, script: str):
+            """Run a scraper in a thread"""
+            try:
+                self.log(f"Starting {platform} scraper in parallel...")
+
+                # Create wrapper script for this thread
+                wrapper_file = Path(f"temp_{platform}_scraper_wrapper.py")
+
+                wrapper_code = textwrap.dedent(f'''
+                    import subprocess
+                    import sys
+                    
+                    # Prepare inputs for the scraper (use normalized search terms with spaces)
+                    inputs = "{self.search_terms}\\n{num_pages}\\n"
+                    
+                    # Run the actual scraper with inputs
+                    result = subprocess.run(
+                        [sys.executable, "{script}"],
+                        input=inputs,
+                        text=True,
+                        capture_output=True,
+                        encoding='utf-8'
+                    )
+                    
+                    # Forward the output
+                    if result.stdout:
+                        print(f"[{platform.upper()}] {{result.stdout}}")
+                    if result.stderr:
+                        print(f"[{platform.upper()}] {{result.stderr}}", file=sys.stderr)
+                    
+                    # Exit with same code
+                    sys.exit(result.returncode)
+                ''')
+
+                with open(wrapper_file, 'w', encoding='utf-8') as f:
+                    f.write(wrapper_code)
+
+                # Run the wrapper script
+                result = subprocess.run(
+                    [sys.executable, str(wrapper_file)],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8'
+                )
+
+                # Clean up wrapper
+                if wrapper_file.exists():
+                    wrapper_file.unlink()
+
+                # Store result
+                with results_lock:
+                    success = result.returncode == 0
+                    results[platform] = success
+
+                    if success:
+                        self.log(f"✓ {platform.capitalize()} scraping completed successfully")
+                    else:
+                        self.log(f"✗ {platform.capitalize()} scraping failed with return code {result.returncode}",
+                                 "ERROR")
+                        if result.stderr:
+                            self.log(f"{platform.capitalize()} error: {result.stderr}", "ERROR")
+
+                    # Log output if verbose
+                    if self.verbose and result.stdout:
+                        for line in result.stdout.split('\n'):
+                            if line.strip():
+                                self.log(f"[{platform.upper()}] {line}")
+
+                return success
+
+            except Exception as e:
+                self.log(f"✗ Failed to run {platform} scraper: {str(e)}", "ERROR")
+                with results_lock:
+                    results[platform] = False
+                return False
+
+        # Run scrapers in parallel
+        self.log("Running scrapers in parallel...")
+        start_time = time.time()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Submit both scraping tasks
+            futures = {
+                executor.submit(run_scraper_thread, 'temu', 'TemuScraper.py'): 'temu',
+                executor.submit(run_scraper_thread, 'amazon', 'AmazonScraper.py'): 'amazon'
+            }
+
+            # Wait for both to complete
+            for future in as_completed(futures):
+                platform = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    self.log(f"Exception in {platform} scraper thread: {e}", "ERROR")
+
+        elapsed = time.time() - start_time
+        self.log(f"Parallel scraping completed in {elapsed:.1f} seconds")
+
+        return results['temu'], results['amazon']
+
+    def update_data_organizers(self):
+        """Create wrapper scripts for data organizers with correct file paths"""
+        # Update Temu organizer
+        temu_wrapper = Path("temp_temu_organizer.py")
+        temu_code = textwrap.dedent(f'''
+            import sys
+            import json
+            from pathlib import Path
+            
+            # Load config
+            with open("pipeline_config.json", 'r') as f:
+                config = json.load(f)
+            
+            # Import and modify the organizer
+            sys.path.insert(0, ".")
+            import TemuDataOrganizer
+            
+            # Override the file paths
+            TemuDataOrganizer.CSV_FILE = Path(config["temu_csv"])
+            TemuDataOrganizer.OUTPUT_FILE = Path(config["temu_json"])
+            
+            # Run the main function
+            TemuDataOrganizer.main()
+        ''')
+
+        # Update Amazon organizer
+        amazon_wrapper = Path("temp_amazon_organizer.py")
+        amazon_code = textwrap.dedent(f'''
+            import sys
+            import json
+            from pathlib import Path
+            
+            # Load config
+            with open("pipeline_config.json", 'r') as f:
+                config = json.load(f)
+            
+            # Import and modify the organizer
+            sys.path.insert(0, ".")
+            import AmazonDataOrganizer
+            
+            # Override the file paths
+            AmazonDataOrganizer.CSV_FILE = Path(config["amazon_csv"])
+            AmazonDataOrganizer.OUTPUT_FILE = Path(config["amazon_json"])
+            
+            # Run the main function
+            AmazonDataOrganizer.main()
+        ''')
+
+        try:
+            with open(temu_wrapper, 'w', encoding='utf-8') as f:
+                f.write(temu_code)
+            with open(amazon_wrapper, 'w', encoding='utf-8') as f:
+                f.write(amazon_code)
+
+            return str(temu_wrapper), str(amazon_wrapper)
+        except Exception as e:
+            self.log(f"Error creating wrapper scripts: {e}", "ERROR")
+            return None, None
 
     def run_matcher_with_filtered_data(self, filtered_temu: Dict, filtered_amazon: Dict) -> bool:
         """Run the matcher with pre-filtered data"""
@@ -348,8 +636,21 @@ class PipelineRunner:
                         "{temp_amazon}"
                     )
 
-                    # Save results
+                    # Save results (use temp file)
                     matcher.save_results(results, "temp_matching_results.json")
+
+                    # Generate LLM review batch if needed (for consistency with standalone)
+                    review_needed = sum(1 for r in results if r.needs_review)
+                    if review_needed > 0:
+                        # Load full products from filtered data
+                        temu_full = {filtered_temu}['all_products']
+                        amazon_full = {filtered_amazon}['all_products']
+                        matcher.generate_llm_review_batch(
+                            results,
+                            temu_full,
+                            amazon_full,
+                            f"llm_review_batch_{self.search_slug}.json"  # Category-specific batch file
+                        )
 
                     print("Matching completed successfully")
                     sys.exit(0)
@@ -431,6 +732,8 @@ class PipelineRunner:
         """Run the complete pipeline"""
         self.log("=" * 60)
         self.log("Starting Temu-Amazon Product Matching Pipeline")
+        self.log(f"Search Terms: '{self.search_terms}'")
+        self.log(f"File Slug: '{self.search_slug}'")
         self.log("=" * 60)
 
         # Clean up any leftover temp files from previous failed runs
@@ -447,37 +750,60 @@ class PipelineRunner:
             self.log("Aborting: Missing required files", "ERROR")
             return False
 
-        # Step 1 & 2: Scraping (can be run in parallel)
+        # Step 1 & 2: Scraping (run in parallel)
         if not self.skip_scraping:
-            self.log("\n--- STEP 1 & 2: Web Scraping ---")
+            self.log("\n--- STEP 1 & 2: Web Scraping (Parallel) ---")
 
-            if not self.run_script("TemuScraper.py", "Scraping Temu products"):
+            # Ask for number of pages
+            try:
+                num_pages = int(input("How many pages to scrape from each site? (default: 1): ") or "1")
+            except ValueError:
+                num_pages = 1
+                self.log("Invalid input, using 1 page")
+
+            # Run scrapers in parallel
+            temu_success, amazon_success = self.run_scrapers_parallel(num_pages)
+
+            # Check results
+            if not temu_success:
                 self.log("Temu scraping failed. Continue anyway? (y/n): ", "WARNING")
                 if input().lower() != 'y':
                     return False
 
-            if not self.run_script("AmazonScraper.py", "Scraping Amazon products"):
+            if not amazon_success:
                 self.log("Amazon scraping failed. Continue anyway? (y/n): ", "WARNING")
                 if input().lower() != 'y':
                     return False
 
-            self.check_output_files(["temu_baby_toys.csv", "amazon_baby_toys.csv"], "Scraping")
+            # Check output files
+            self.check_output_files([self.temu_csv, self.amazon_csv], "Scraping")
         else:
             self.log("\n--- Skipping scraping (using existing CSVs) ---")
 
         # Step 3 & 4: Data Organization
         self.log("\n--- STEP 3 & 4: Data Organization ---")
 
-        if not self.run_script("TemuDataOrganizer.py", "Organizing Temu data"):
+        # Create wrapper scripts with dynamic paths
+        temu_wrapper, amazon_wrapper = self.update_data_organizers()
+
+        if not temu_wrapper or not amazon_wrapper:
+            self.log("Failed to create organizer wrappers", "ERROR")
             return False
 
-        if not self.run_script("AmazonDataOrganizer.py", "Organizing Amazon data"):
+        if not self.run_script(temu_wrapper, "Organizing Temu data"):
             return False
 
-        if not self.check_output_files(
-                ["temu_products_for_analysis.json", "amazon_products_for_analysis.json"],
-                "Data organization"
-        ):
+        if not self.run_script(amazon_wrapper, "Organizing Amazon data"):
+            return False
+
+        # Clean up wrapper scripts
+        for wrapper in [temu_wrapper, amazon_wrapper]:
+            try:
+                Path(wrapper).unlink()
+            except:
+                pass
+
+        if not self.check_output_files([self.temu_json, self.amazon_json], "Data organization"):
             return False
 
         # Step 5: Incremental Product Matching
@@ -485,11 +811,11 @@ class PipelineRunner:
 
         # Load organized data
         try:
-            with open("temu_products_for_analysis.json", 'r', encoding='utf-8') as f:
+            with open(self.temu_json, 'r', encoding='utf-8') as f:
                 temu_data = json.load(f)
             temu_products = temu_data.get('all_products', [])
 
-            with open("amazon_products_for_analysis.json", 'r', encoding='utf-8') as f:
+            with open(self.amazon_json, 'r', encoding='utf-8') as f:
                 amazon_data = json.load(f)
             amazon_products = amazon_data.get('all_products', [])
         except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -536,18 +862,16 @@ class PipelineRunner:
                 # Merge with existing results
                 merged_results = self.incremental_matcher.merge_results(new_results)
 
-                # Save merged results
+                # Save merged results (use category-specific name for LLM compatibility)
+                merged_file = f"matching_results_{self.search_slug}.json"
                 try:
-                    with open("matching_results.json", 'w', encoding='utf-8') as f:
+                    with open(merged_file, 'w', encoding='utf-8') as f:
                         json.dump(merged_results, f, indent=2)
                 except Exception as e:
                     self.log(f"Error saving merged results: {e}", "ERROR")
                     return False
 
-                # Update product hashes
-                self.incremental_matcher.update_product_hashes(temu_products, amazon_products)
-
-                self.log("Incremental matching completed successfully")
+                self.log(f"Incremental matching completed successfully. Results saved to {merged_file}")
 
             finally:
                 # Always clean up temp file, even if something failed
@@ -567,18 +891,24 @@ class PipelineRunner:
 
             # Only run LLM on new/updated matches if needed
             try:
-                with open("matching_results.json", 'r', encoding='utf-8') as f:
+                # Load from the category-specific file we just saved
+                merged_file = f"matching_results_{self.search_slug}.json"
+                with open(merged_file, 'r', encoding='utf-8') as f:
                     current_results = json.load(f)
 
                 new_match_count = current_results.get('metadata', {}).get('new_matches', 0)
                 if new_match_count > 0:
                     self.log(f"Running LLM analysis on {new_match_count} new matches")
+                    # Pass category as input to avoid prompt hang and use correct file
+                    category_input = self.search_slug + "\n"
                     if not self.run_script(
                             "ImageFinalPassLLM.py",
-                            "Running LLM re-ranking on matches"):
+                            "Running LLM re-ranking on matches",
+                            input_text=category_input
+                    ):
                         self.log("LLM enhancement failed – continuing pipeline", "WARNING")
                 else:
-                        self.log("No new matches found—skipping LLM enhancement")
+                    self.log("No new matches found—skipping LLM enhancement")
             except Exception as e:
                 self.log(f"Error in LLM enhancement: {e}", "WARNING")
         else:
@@ -610,6 +940,12 @@ class PipelineRunner:
                 self.log("  Or: python -m http.server 8000")
             except Exception as e:
                 self.log(f"Error opening dashboard: {e}", "ERROR")
+
+        # Clean up config file
+        try:
+            Path("pipeline_config.json").unlink()
+        except:
+            pass
 
         # Summary
         elapsed_time = time.time() - self.start_time
@@ -723,8 +1059,25 @@ class PipelineRunner:
             self.log(f"Could not load results summary: {e}", "WARNING")
 
 
+def find_existing_search_terms() -> List[str]:
+    """Find all existing search terms by looking at CSV files"""
+    csv_files = list(Path(".").glob("temu_*.csv"))
+    search_terms = []
+
+    for csv_file in csv_files:
+        match = re.match(r"temu_(.+)\.csv", csv_file.name)
+        if match:
+            # Convert underscores back to spaces for display
+            term = match.group(1).replace('_', ' ')
+            search_terms.append(term)
+
+    return search_terms
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the complete Temu-Amazon matching pipeline")
+    parser.add_argument("--search", type=str, default=None,
+                        help="Search terms for products (e.g., 'baby toys', 'kitchen gadgets')")
     parser.add_argument("--skip-scraping", action="store_true",
                         help="Skip web scraping (use existing CSV files)")
     parser.add_argument("--skip-llm", action="store_true",
@@ -752,15 +1105,53 @@ def main():
         print("History cleared. Run pipeline again to start fresh.")
         return
 
+    # Get search terms
+    if args.search:
+        # Normalize the provided search terms
+        search_terms = normalize_search_terms(args.search)
+    elif not args.skip_scraping:
+        # Ask for search terms if not provided and scraping is enabled
+        user_input = input("Enter search terms (default: 'baby toys'): ").strip()
+        search_terms = normalize_search_terms(user_input) if user_input else "baby toys"
+    else:
+        # For skipping scraping, try to detect existing files
+        print("Looking for existing CSV files...")
+        existing_terms = find_existing_search_terms()
+
+        if existing_terms:
+            print("Found existing searches:")
+            for i, term in enumerate(existing_terms):
+                print(f"  {i + 1}. {term}")
+
+            choice = input("Enter number to use existing search, or type new search terms: ").strip()
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(existing_terms):
+                    search_terms = existing_terms[idx]
+                else:
+                    search_terms = normalize_search_terms(choice)
+            except ValueError:
+                search_terms = normalize_search_terms(choice) if choice else "baby toys"
+        else:
+            user_input = input("Enter search terms (default: 'baby toys'): ").strip()
+            search_terms = normalize_search_terms(user_input) if user_input else "baby toys"
+
     if args.step:
-        runner = PipelineRunner(verbose=not args.quiet)
+        runner = PipelineRunner(verbose=not args.quiet, search_terms=search_terms)
 
         if args.step == "scrape":
-            runner.run_script("TemuScraper.py", "Scraping Temu products")
-            runner.run_script("AmazonScraper.py", "Scraping Amazon products")
+            num_pages = int(input("How many pages to scrape? (default: 1): ") or "1")
+            # Use parallel scraping
+            runner.run_scrapers_parallel(num_pages)
         elif args.step == "organize":
-            runner.run_script("TemuDataOrganizer.py", "Organizing Temu data")
-            runner.run_script("AmazonDataOrganizer.py", "Organizing Amazon data")
+            temu_wrapper, amazon_wrapper = runner.update_data_organizers()
+            runner.run_script(temu_wrapper, "Organizing Temu data")
+            runner.run_script(amazon_wrapper, "Organizing Amazon data")
+            for wrapper in [temu_wrapper, amazon_wrapper]:
+                try:
+                    Path(wrapper).unlink()
+                except:
+                    pass
         elif args.step == "match":
             runner.run_script("TemuAmazonProductMatcher.py", "Matching products")
         elif args.step == "llm":
@@ -782,7 +1173,8 @@ def main():
             skip_scraping=args.skip_scraping,
             skip_llm=args.skip_llm,
             verbose=not args.quiet,
-            use_http_server=True
+            use_http_server=args.http_server,
+            search_terms=search_terms
         )
         runner.run_pipeline()
 
