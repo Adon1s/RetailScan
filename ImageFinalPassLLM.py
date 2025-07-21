@@ -1,511 +1,637 @@
 """
-Temu-Amazon Product Matcher
-Matches products between Temu and Amazon using multiple similarity methods
+LLM Re-ranking for Product Matches
+Re-ranks top product matches using a vision-language model via LM Studio
 """
 import json
-import re
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-import numpy as np
-from dataclasses import dataclass
-from datetime import datetime
-
-# Core matching libraries
-from rapidfuzz import fuzz, process
-from sentence_transformers import SentenceTransformer
-import torch
-from PIL import Image
+import base64
 import requests
-from io import BytesIO
-import sys
+import fire
+import time
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple, Set
+from dataclasses import dataclass, asdict
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import math
+import re  # Added for potential cleanup if needed
 
-# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-
-# Optional: CLIP for image similarity
-try:
-    import clip
-    CLIP_AVAILABLE = True
-except ImportError:
-    clip = None  # Define clip as None to avoid NameError
-    CLIP_AVAILABLE = False
-    print("CLIP not installed. Image matching will be disabled.")
-    print("Install with: pip install git+https://github.com/openai/CLIP.git")
+# LM Studio configuration
+LM_STUDIO_URL = "http://localhost:1234"  # Update with your LM Studio URL
+DEFAULT_MODEL = None  # Will use whatever model is loaded in LM Studio
 
 
 @dataclass
-class MatchResult:
-    """Represents a product match between Temu and Amazon"""
-    temu_id: str
-    amazon_id: str
-    confidence: float
-    match_method: str
-    fuzzy_score: float
-    embedding_score: float = 0.0
-    image_score: float = 0.0
-    verdict_reason: str = ""
-    needs_review: bool = False
-    # Add these new fields for dashboard compatibility
-    temu_title: str = ""
-    amazon_title: str = ""
-    temu_price: float = 0.0
-    amazon_price: float = 0.0
+class LLMVerdict:
+    """Result from LLM analysis of a product pair"""
+    same_product: bool
+    rationale: str
+    image_similarity: float
+    processing_time: float
 
 
-class ProductMatcher:
-    def __init__(self, use_images: bool = True):
-        """Initialize the matcher with models"""
-        print("Initializing ProductMatcher...")
+def sanitize_filename(filename: str) -> str:
+    """Sanitize string for use in filenames (matches scraper logic)"""
+    sanitized = re.sub(r'[^\w\s-]', '', filename)
+    sanitized = re.sub(r'[-\s]+', '_', sanitized)
+    return sanitized.lower()
 
-        # Sentence transformer for semantic matching
-        self.sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-        # CLIP for image matching (if available and requested)
-        print(f"  › use_images flag: {use_images}, CLIP_AVAILABLE: {CLIP_AVAILABLE}")
-        self.use_images = use_images and CLIP_AVAILABLE
-        if self.use_images:
-            assert clip is not None  # Tell IDE that clip cannot be None here
-            self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device="cuda" if torch.cuda.is_available() else "cpu")
-            print("CLIP model loaded for image matching")
+class ProductMatchReranker:
+    def __init__(self,
+                 lm_studio_url: str = LM_STUDIO_URL,
+                 model_name: Optional[str] = DEFAULT_MODEL,
+                 image_dirs: Dict[str, Path] = None):
+        """
+        Initialize the reranker
 
-        # Cache for embeddings
-        self.title_embeddings_cache = {}
-        self.image_embeddings_cache = {}
+        Args:
+            lm_studio_url: URL of LM Studio server
+            model_name: Specific model to use (optional)
+            image_dirs: Dict with 'temu' and 'amazon' paths to image directories
+        """
+        self.lm_studio_url = lm_studio_url
+        self.model_name = model_name
+        self.image_dirs = image_dirs or {
+            'temu': Path('temu_baby_toys_imgs'),
+            'amazon': Path('amazon_baby_toys_imgs')
+        }
 
-        # Updated thresholds for better matching
-        self.FUZZY_IMMEDIATE_ACCEPT = 90  # Lowered from 93
-        self.FUZZY_CANDIDATE_MIN = 40     # Lowered significantly from 85
-        self.EMBEDDING_MIN = 0.70          # Lowered from 0.80
-        self.IMAGE_MIN = 0.85              # Lowered from 0.88
+        # Try local SDK first
+        self.use_local_sdk = self._check_local_sdk()
 
-    def clean_title(self, title: str) -> str:
-        """Clean and normalize product title"""
-        # Remove special characters but keep spaces and numbers
-        title = re.sub(r'[^\w\s-]', ' ', title.lower())
-        # Remove extra spaces
-        title = ' '.join(title.split())
-        # Remove common filler words only if title is long enough
-        filler_words = ['for', 'with', 'and', 'the', 'in', 'on', 'at', 'to', 'a', 'an']
-        words = title.split()
-        if len(words) > 5:  # Only remove filler words from longer titles
-            cleaned = [w for w in words if w not in filler_words]
-            return ' '.join(cleaned)
-        return title
+    def _check_local_sdk(self) -> bool:
+        """Check if local LM Studio SDK is available"""
+        # Temporarily disable local SDK due to bosToken issues
+        # Uncomment the lines below to re-enable local SDK
+        logger.info("Using remote LM Studio API (local SDK disabled)")
+        return False
 
-    def get_title_embedding(self, title: str) -> np.ndarray:
-        """Get sentence embedding for title (cached)"""
-        if title not in self.title_embeddings_cache:
-            self.title_embeddings_cache[title] = self.sentence_model.encode(title)
-        return self.title_embeddings_cache[title]
+        # try:
+        #     import lmstudio as lms
+        #     logger.info("Local LM Studio SDK detected")
+        #     return True
+        # except ImportError:
+        #     logger.info("Using remote LM Studio API")
+        #     return False
 
-    def get_image_embedding(self, image_path_or_url: str) -> Optional[np.ndarray]:
-        """Get CLIP embedding for image (cached)"""
-        if not self.use_images:
+    def select_top_candidates(self,
+                              matches: List[Dict],
+                              percentage: float = 0.35,
+                              min_confidence: float = 0.6) -> List[Dict]:
+        """
+        Select top percentage of matches for LLM re-ranking
+
+        Args:
+            matches: List of match dictionaries
+            percentage: Top percentage to select (0-1)
+            min_confidence: Minimum confidence threshold
+
+        Returns:
+            Selected matches for LLM processing
+        """
+        # Sort by confidence (descending)
+        sorted_matches = sorted(matches, key=lambda x: x['confidence'], reverse=True)
+
+        # Calculate how many to take
+        top_n = math.ceil(len(sorted_matches) * percentage)
+
+        # Apply confidence floor
+        candidates = []
+        for match in sorted_matches[:top_n]:
+            if match['confidence'] >= min_confidence:
+                candidates.append(match)
+            else:
+                break  # Since sorted, no point checking further
+
+        logger.info(f"Selected {len(candidates)} candidates from {len(matches)} matches "
+                    f"(top {percentage * 100}% with confidence >= {min_confidence})")
+
+        return candidates
+
+    def _load_image_as_base64(self, image_path: Path) -> Optional[str]:
+        """Load image and convert to base64"""
+        if not image_path.exists():
+            logger.warning(f"Image not found: {image_path}")
             return None
-
-        if image_path_or_url in self.image_embeddings_cache:
-            return self.image_embeddings_cache[image_path_or_url]
 
         try:
-            # Load image
-            if image_path_or_url.startswith('http'):
-                response = requests.get(image_path_or_url, timeout=10)
-                image = Image.open(BytesIO(response.content))
-            else:
-                image = Image.open(image_path_or_url)
-
-            # Process with CLIP
-            image_input = self.clip_preprocess(image).unsqueeze(0)
-            if torch.cuda.is_available():
-                image_input = image_input.cuda()
-
-            with torch.no_grad():
-                embedding = self.clip_model.encode_image(image_input)
-                embedding = embedding.cpu().numpy().flatten()
-                embedding = embedding / np.linalg.norm(embedding)  # Normalize
-
-            self.image_embeddings_cache[image_path_or_url] = embedding
-            return embedding
-
+            with open(image_path, 'rb') as img_file:
+                return base64.b64encode(img_file.read()).decode('utf-8')
         except Exception as e:
-            print(f"Error processing image {image_path_or_url}: {e}")
+            logger.error(f"Error loading image {image_path}: {e}")
             return None
 
-    def cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
-        """Calculate cosine similarity between two vectors"""
-        return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+    def _create_prompt(self, match: Dict) -> str:
+        """Create the LLM prompt string (extracted to avoid duplication)."""
+        temu_price = match.get('temu_price', 0)
+        amazon_price = match.get('amazon_price', 0)
+        price_diff = abs(amazon_price - temu_price)
+        price_diff_pct = (price_diff / min(temu_price, amazon_price) * 100) if min(temu_price, amazon_price) > 0 else 0
 
-    def match_single_product(self, temu_product: Dict, amazon_products: List[Dict],
-                           temu_img_dir: Path, amazon_img_dir: Path) -> MatchResult:
-        """Match a single Temu product against all Amazon products"""
-        temu_id = temu_product['temu_id']
-        temu_title = temu_product['title']
-        temu_title_clean = self.clean_title(temu_title)
+        return f"""You are a product-matching assistant. Analyze these two products and determine if they represent the SAME physical product (not just similar category).
 
-        # Prepare Amazon titles
-        amazon_titles = [p['title'] for p in amazon_products]
-        amazon_titles_clean = [self.clean_title(t) for t in amazon_titles]
+Product 1 (Temu):
+- Title: {match.get('temu_title', 'Unknown')}
+- Price: ${temu_price:.2f}
 
-        # Step 1: Fuzzy matching - try multiple scorers
-        fuzzy_matches_token = process.extract(
-            temu_title_clean,
-            amazon_titles_clean,
-            scorer=fuzz.token_set_ratio,
-            limit=10  # Get more candidates
-        )
+Product 2 (Amazon):
+- Title: {match.get('amazon_title', 'Unknown')}
+- Price: ${amazon_price:.2f}
 
-        # Also try partial ratio for substring matches
-        fuzzy_matches_partial = process.extract(
-            temu_title_clean,
-            amazon_titles_clean,
-            scorer=fuzz.partial_ratio,
-            limit=10
-        )
+Price difference: ${price_diff:.2f} ({price_diff_pct:.1f}%)
 
-        # Combine and deduplicate matches
-        all_matches = {}
-        for match_str, score, idx in fuzzy_matches_token:
-            all_matches[idx] = max(all_matches.get(idx, 0), score)
-        for match_str, score, idx in fuzzy_matches_partial:
-            all_matches[idx] = max(all_matches.get(idx, 0), score)
+Consider:
+1. Visual appearance (shape, color, design, components)
+2. Product features and accessories
+3. Brand/manufacturer (if visible)
+4. Whether price difference is reasonable for same product
 
-        # Sort by score
-        sorted_matches = sorted(all_matches.items(), key=lambda x: x[1], reverse=True)[:10]
+Respond with JSON only:
+{{
+  "same_product": true/false,
+  "image_similarity": 0.0-1.0,
+  "rationale": "Brief explanation"
+}}"""
 
-        if not sorted_matches:
-            # Fallback if no matches at all
-            return MatchResult(
-                temu_id=temu_id,
-                amazon_id=amazon_products[0]['amazon_id'],
-                confidence=0.0,
-                match_method="no_match",
-                fuzzy_score=0.0,
-                verdict_reason="No fuzzy matches found",
-                needs_review=True,
-                temu_title=temu_product['title'],
-                amazon_title=amazon_products[0]['title'],
-                temu_price=float(temu_product.get('price', 0)),
-                amazon_price=float(amazon_products[0].get('price', 0))
-            )
+    def _prepare_llm_prompt(self, match: Dict, temu_img_b64: str, amazon_img_b64: str) -> Dict:
+        """Prepare the prompt for LLM analysis"""
+        prompt_text = self._create_prompt(match)
 
-        # Get best match info
-        best_fuzzy_idx, best_fuzzy_score = sorted_matches[0]
+        # Build message content
+        content = [{"type": "text", "text": prompt_text}]
 
-        # Check for immediate acceptance
-        if best_fuzzy_score >= self.FUZZY_IMMEDIATE_ACCEPT:
-            return MatchResult(
-                temu_id=temu_id,
-                amazon_id=amazon_products[best_fuzzy_idx]['amazon_id'],
-                confidence=best_fuzzy_score / 100,
-                match_method="fuzzy_immediate",
-                fuzzy_score=best_fuzzy_score,
-                verdict_reason=f"Very high fuzzy match score ({best_fuzzy_score}%)",
-                temu_title=temu_product['title'],
-                amazon_title=amazon_products[best_fuzzy_idx]['title'],
-                temu_price=float(temu_product.get('price', 0)),
-                amazon_price=float(amazon_products[best_fuzzy_idx].get('price', 0))
-            )
+        if temu_img_b64:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{temu_img_b64}"}
+            })
 
-        # Always try embedding comparison for top candidates
-        temu_embedding = self.get_title_embedding(temu_title)
-        best_match = None
-        best_combined_score = 0
+        if amazon_img_b64:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{amazon_img_b64}"}
+            })
 
-        # Check more candidates, even with lower fuzzy scores
-        for idx, fuzzy_score in sorted_matches[:5]:  # Check top 5
-            amazon_product = amazon_products[idx]
-            amazon_embedding = self.get_title_embedding(amazon_product['title'])
+        return {
+            "messages": [{
+                "role": "user",
+                "content": content
+            }],
+            "max_tokens": 200,
+            "temperature": 0.1,  # Low temperature for consistency
+            "stream": False
+        }
 
-            # Calculate embedding similarity
-            embedding_score = self.cosine_similarity(temu_embedding, amazon_embedding)
+    def _analyze_match_local(self, match: Dict, temu_img_path: Path, amazon_img_path: Path) -> Optional[LLMVerdict]:
+        """Analyze using local LM Studio SDK"""
+        try:
+            import lmstudio as lms
 
-            # Step 4: Image similarity (if available)
-            image_score = 0.0
-            if self.use_images:
-                temu_img_path = temu_img_dir / f"{temu_id}.jpg"
-                amazon_img_path = amazon_img_dir / f"{amazon_product['amazon_id']}.jpg"
+            model = lms.llm(self.model_name) if self.model_name else lms.llm()
 
-                if temu_img_path.exists() and amazon_img_path.exists():
-                    temu_img_emb = self.get_image_embedding(str(temu_img_path))
-                    amazon_img_emb = self.get_image_embedding(str(amazon_img_path))
+            # Prepare images
+            images = []
+            if temu_img_path.exists():
+                images.append(lms.prepare_image(str(temu_img_path)))
+            if amazon_img_path.exists():
+                images.append(lms.prepare_image(str(amazon_img_path)))
 
-                    if temu_img_emb is not None and amazon_img_emb is not None:
-                        image_score = self.cosine_similarity(temu_img_emb, amazon_img_emb)
+            # Create prompt
+            prompt = self._create_prompt(match)
 
-            # Calculate combined score with adjusted weights
-            if self.use_images and image_score > 0:
-                # With images: fuzzy 25%, embedding 35%, image 40%
-                combined_score = (fuzzy_score/100 * 0.25 + embedding_score * 0.35 + image_score * 0.40)
-                method = "fuzzy+embedding+image"
+            chat = lms.Chat()
+            chat.add_user_message(prompt, images=images)
 
-                if embedding_score >= self.EMBEDDING_MIN and image_score >= self.IMAGE_MIN:
-                    verdict = f"Strong match: fuzzy={fuzzy_score:.1f}%, embedding={embedding_score:.2f}, image={image_score:.2f}"
-                    needs_review = False
-                elif embedding_score >= self.EMBEDDING_MIN:
-                    verdict = f"Good text match, moderate image: fuzzy={fuzzy_score:.1f}%, embedding={embedding_score:.2f}, image={image_score:.2f}"
-                    needs_review = image_score < 0.7
-                else:
-                    verdict = f"Moderate match: fuzzy={fuzzy_score:.1f}%, embedding={embedding_score:.2f}, image={image_score:.2f}"
-                    needs_review = True
+            start_time = time.time()
+            response = model.respond(chat)
+            processing_time = time.time() - start_time
+
+            # The response is a PredictionResult object, get the text content
+            response_text = str(response)
+
+            # Parse JSON from response text
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
             else:
-                # Without images: fuzzy 40%, embedding 60%
-                combined_score = (fuzzy_score/100 * 0.40 + embedding_score * 0.60)
-                method = "fuzzy+embedding"
+                # Try to parse the whole response as JSON
+                result = json.loads(response_text)
 
-                if embedding_score >= self.EMBEDDING_MIN:
-                    verdict = f"Good text match: fuzzy={fuzzy_score:.1f}%, embedding={embedding_score:.2f}"
-                    needs_review = False
-                else:
-                    verdict = f"Moderate text match: fuzzy={fuzzy_score:.1f}%, embedding={embedding_score:.2f}"
-                    needs_review = True
-
-            if combined_score > best_combined_score:
-                best_combined_score = combined_score
-                best_match = MatchResult(
-                    temu_id=temu_id,
-                    amazon_id=amazon_product['amazon_id'],
-                    confidence=combined_score,
-                    match_method=method,
-                    fuzzy_score=fuzzy_score,
-                    embedding_score=embedding_score,
-                    image_score=image_score,
-                    verdict_reason=verdict,
-                    needs_review=needs_review,
-                    temu_title=temu_product['title'],
-                    amazon_title=amazon_product['title'],
-                    temu_price=float(temu_product.get('price', 0)),
-                    amazon_price=float(amazon_product.get('price', 0))
-                )
-
-        # Always return the best match we found
-        if best_match:
-            return best_match
-        else:
-            # Fallback: return first match with low confidence
-            return MatchResult(
-                temu_id=temu_id,
-                amazon_id=amazon_products[best_fuzzy_idx]['amazon_id'],
-                confidence=best_fuzzy_score / 100 * 0.3,
-                match_method="fuzzy_only",
-                fuzzy_score=best_fuzzy_score,
-                embedding_score=0.0,
-                verdict_reason=f"Low fuzzy match ({best_fuzzy_score:.1f}%), needs manual review",
-                needs_review=True,
-                temu_title=temu_product['title'],
-                amazon_title=amazon_products[best_fuzzy_idx]['title'],
-                temu_price=float(temu_product.get('price', 0)),
-                amazon_price=float(amazon_products[best_fuzzy_idx].get('price', 0))
+            return LLMVerdict(
+                same_product=result['same_product'],
+                rationale=result.get('rationale', ''),
+                image_similarity=result.get('image_similarity', 0.0),
+                processing_time=processing_time
             )
 
-    def match_all_products(self, temu_file: str, amazon_file: str,
-                          temu_img_dir: str = "temu_baby_toys_imgs",
-                          amazon_img_dir: str = "amazon_baby_toys_imgs") -> List[MatchResult]:
-        """Match all products between Temu and Amazon"""
-        # Load data
-        with open(temu_file, 'r', encoding='utf-8') as f:
-            temu_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Local SDK error: {e}")
+            return None
 
-        with open(amazon_file, 'r', encoding='utf-8') as f:
-            amazon_data = json.load(f)
+    def _analyze_match_remote(self, match: Dict, temu_img_b64: str, amazon_img_b64: str) -> Optional[LLMVerdict]:
+        """Analyze using remote LM Studio API"""
+        try:
+            payload = self._prepare_llm_prompt(match, temu_img_b64, amazon_img_b64)
+            if self.model_name:
+                payload["model"] = self.model_name
 
-        # Extract products
-        temu_products = self._extract_products(temu_data, 'temu')
-        amazon_products = self._extract_products(amazon_data, 'amazon')
+            start_time = time.time()
+            response = requests.post(
+                f"{self.lm_studio_url}/v1/chat/completions",
+                json=payload,
+                timeout=60
+            )
+            processing_time = time.time() - start_time
 
-        print(f"Loaded {len(temu_products)} Temu products and {len(amazon_products)} Amazon products")
+            if response.status_code != 200:
+                logger.error(f"API error: {response.status_code} - {response.text}")
+                return None
 
-        # Convert paths
-        temu_img_path = Path(temu_img_dir)
-        amazon_img_path = Path(amazon_img_dir)
+            result_text = response.json()['choices'][0]['message']['content']
 
-        # Match each Temu product
+            # Parse JSON from response
+            # Try to extract JSON if wrapped in text
+            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                result = json.loads(result_text)
+
+            return LLMVerdict(
+                same_product=result['same_product'],
+                rationale=result.get('rationale', ''),
+                image_similarity=result.get('image_similarity', 0.0),
+                processing_time=processing_time
+            )
+
+        except Exception as e:
+            logger.error(f"Remote API error for match {match['temu_id']}-{match['amazon_id']}: {e}")
+            return None
+
+    def analyze_single_match(self, match: Dict) -> Tuple[Dict, Optional[LLMVerdict]]:
+        """Analyze a single match with LLM"""
+        temu_id = match['temu_id']
+        amazon_id = match['amazon_id']
+
+        # Get image paths
+        temu_img_path = self.image_dirs['temu'] / f"{temu_id}.jpg"
+        amazon_img_path = self.image_dirs['amazon'] / f"{amazon_id}.jpg"
+
+        # Try local SDK first
+        if self.use_local_sdk:
+            verdict = self._analyze_match_local(match, temu_img_path, amazon_img_path)
+            if verdict:
+                return match, verdict
+
+        # Fallback to remote API
+        temu_img_b64 = self._load_image_as_base64(temu_img_path)
+        amazon_img_b64 = self._load_image_as_base64(amazon_img_path)
+
+        if not temu_img_b64 and not amazon_img_b64:
+            logger.warning(f"No images found for match {temu_id}-{amazon_id}, skipping")
+            return match, None
+
+        verdict = self._analyze_match_remote(match, temu_img_b64, amazon_img_b64)
+        return match, verdict
+
+    def run_llm_batch(self,
+                      candidates: List[Dict],
+                      batch_size: int = 5,
+                      max_workers: int = 3,
+                      checkpoint_interval: int = 5) -> List[Tuple[Dict, Optional[LLMVerdict]]]:
+        """
+        Process candidates in batches with LLM
+
+        Args:
+            candidates: List of match candidates
+            batch_size: Number to process in parallel
+            max_workers: Max concurrent threads
+            checkpoint_interval: Save checkpoint every N results
+
+        Returns:
+            List of (match, verdict) tuples
+        """
         results = []
-        for i, temu_product in enumerate(temu_products):
-            if i % 10 == 0:
-                print(f"Processing product {i+1}/{len(temu_products)}...")
+        total = len(candidates)
+        processed_count = 0
 
-            match = self.match_single_product(
-                temu_product, amazon_products, temu_img_path, amazon_img_path
-            )
-            results.append(match)
+        # Load checkpoint if exists
+        checkpoint_file = Path("llm_processing.checkpoint.json")
+        processed_keys = set()
+
+        if checkpoint_file.exists():
+            try:
+                with open(checkpoint_file, 'r', encoding='utf-8') as f:
+                    checkpoint_data = json.load(f)
+                    checkpoint_results = checkpoint_data.get('results', [])
+
+                    # Convert back to LLMVerdict objects and track processed keys
+                    for match, verdict_dict in checkpoint_results:
+                        key = f"{match['temu_id']}_{match['amazon_id']}"
+                        processed_keys.add(key)
+
+                        if verdict_dict:
+                            verdict = LLMVerdict(**verdict_dict)
+                        else:
+                            verdict = None
+                        results.append((match, verdict))
+
+                    logger.info(f"Loaded {len(results)} results from checkpoint")
+            except Exception as e:
+                logger.error(f"Error loading checkpoint: {e}")
+
+        # Filter out already processed candidates
+        remaining_candidates = []
+        for candidate in candidates:
+            key = f"{candidate['temu_id']}_{candidate['amazon_id']}"
+            if key not in processed_keys:
+                remaining_candidates.append(candidate)
+
+        if not remaining_candidates:
+            logger.info("All candidates already processed")
+            return results
+
+        logger.info(f"Processing {len(remaining_candidates)} remaining candidates (already processed: {len(processed_keys)})")
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for i in range(0, len(remaining_candidates), batch_size):
+                future_to_match = {}  # Reset for each batch
+                batch = remaining_candidates[i:i + batch_size]
+                for match in batch:
+                    future = executor.submit(self.analyze_single_match, match)
+                    future_to_match[future] = match
+
+                # Process completed futures
+                for future in as_completed(future_to_match):
+                    match, verdict = future.result()
+                    results.append((match, verdict))
+                    processed_count += 1
+
+                    if verdict:
+                        logger.info(f"Processed {match['temu_id']}-{match['amazon_id']}: "
+                                    f"same_product={verdict.same_product} "
+                                    f"[{processed_count}/{len(remaining_candidates)}]")
+                    else:
+                        logger.warning(f"Failed to process {match['temu_id']}-{match['amazon_id']} "
+                                       f"[{processed_count}/{len(remaining_candidates)}]")
+
+                    # Save checkpoint at intervals
+                    if processed_count % checkpoint_interval == 0:
+                        self._save_checkpoint(results, checkpoint_file)
+
+                # Rate limiting between batches
+                if i + batch_size < len(remaining_candidates):
+                    time.sleep(1)
+
+        # Save final checkpoint
+        self._save_checkpoint(results, checkpoint_file)
 
         return results
 
-    def _extract_products(self, data: Dict, source: str) -> List[Dict]:
-        """Extract products from various JSON structures"""
-        if source == 'temu':
-            if 'all_products' in data:
-                return data['all_products']
-            elif 'products' in data:
-                return data['products']
-            elif 'results' in data:
-                return data['results']
-        else:  # amazon
-            if 'all_products' in data:
-                return data['all_products']
-            elif 'products' in data:
-                return data['products']
-            elif 'top_prospects' in data:
-                # Gather from different sections
-                products = []
-                for section in ['by_keyword_density', 'by_price_potential', 'by_margin_potential']:
-                    if section in data['top_prospects']:
-                        products.extend(data['top_prospects'][section])
-                # Remove duplicates
-                seen = set()
-                unique = []
-                for p in products:
-                    if p['amazon_id'] not in seen:
-                        seen.add(p['amazon_id'])
-                        unique.append(p)
-                return unique
+    def _save_checkpoint(self, results: List[Tuple[Dict, Optional[LLMVerdict]]], checkpoint_file: Path):
+        """Save checkpoint to file"""
+        serializable_results = []
+        for match, verdict in results:
+            if verdict:
+                verdict_dict = asdict(verdict)
+            else:
+                verdict_dict = None
+            serializable_results.append((match, verdict_dict))
 
-        # Fallback
-        return []
-
-    def save_results(self, results: List[MatchResult], output_file: str = "matching_results.json"):
-        """Save matching results to JSON"""
-        output = {
-            "metadata": {
-                "timestamp": datetime.now().isoformat(),
-                "total_matches": len(results),
-                "high_confidence": len([r for r in results if r.confidence >= 0.8]),
-                "medium_confidence": len([r for r in results if 0.6 <= r.confidence < 0.8]),
-                "low_confidence": len([r for r in results if r.confidence < 0.6]),
-                "needs_review": len([r for r in results if r.needs_review]),
-                "use_images": self.use_images
-            },
-            "matches": []
+        checkpoint_data = {
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'total_processed': len(results),
+            'results': serializable_results
         }
 
-        for result in results:
-            output["matches"].append({
-                "temu_id": result.temu_id,
-                "amazon_id": result.amazon_id,
-                "confidence": round(result.confidence, 3),
-                # Add the missing fields here
-                "temu_title": result.temu_title,
-                "amazon_title": result.amazon_title,
-                "temu_price": result.temu_price,
-                "amazon_price": result.amazon_price,
-                # Existing fields
-                "match_method": result.match_method,
-                "scores": {
-                    "fuzzy": round(result.fuzzy_score, 1),
-                    "embedding": round(result.embedding_score, 3),
-                    "image": round(result.image_score, 3) if result.image_score > 0 else None
-                },
-                "verdict": result.verdict_reason,
-                "needs_review": result.needs_review
-            })
+        with open(checkpoint_file, 'w', encoding='utf-8') as f:
+            json.dump(checkpoint_data, f, indent=2)
 
-        # Sort by confidence
-        output["matches"].sort(key=lambda x: x["confidence"], reverse=True)
+        logger.info(f"Checkpoint saved: {len(results)} results")
 
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(output, f, indent=2)
+    def merge_llm_results(self,
+                          original_matches: List[Dict],
+                          llm_results: List[Tuple[Dict, Optional[LLMVerdict]]]) -> List[Dict]:
+        """Merge LLM verdicts back into matches"""
+        # Create lookup for LLM results
+        llm_lookup = {}
+        for match, verdict in llm_results:
+            key = f"{match['temu_id']}_{match['amazon_id']}"
+            llm_lookup[key] = verdict
 
-        print(f"\nResults saved to {output_file}")
-        print(f"High confidence matches (≥0.8): {output['metadata']['high_confidence']}")
-        print(f"Medium confidence matches (0.6-0.8): {output['metadata']['medium_confidence']}")
-        print(f"Low confidence matches (<0.6): {output['metadata']['low_confidence']}")
-        print(f"Needs review: {output['metadata']['needs_review']}")
+        # Enhance matches with LLM data
+        enhanced_matches = []
+        for match in original_matches:
+            key = f"{match['temu_id']}_{match['amazon_id']}"
+            enhanced_match = match.copy()
 
-    def generate_llm_review_batch(
-            self,
-            results: List[MatchResult],
-            temu_data: List[Dict],
-            amazon_data: List[Dict],
-            output_file: str = "llm_review_batch.json",
-            confidence_threshold: float = 0.7
-    ) -> None:
-        """Generate batch of items for LLM review"""
-        review_items = []
+            if key in llm_lookup and llm_lookup[key]:
+                verdict = llm_lookup[key]
+                enhanced_match['llm_same_product'] = verdict.same_product
+                enhanced_match['llm_rationale'] = verdict.rationale
+                enhanced_match['llm_image_similarity'] = verdict.image_similarity
+                enhanced_match['llm_processing_time'] = verdict.processing_time
+                enhanced_match['llm_processed'] = True
+            else:
+                enhanced_match['llm_processed'] = False
 
-        for result in results:
-            if result.needs_review or result.confidence < confidence_threshold:
-                # Get full product data
-                temu_product = next((p for p in temu_data if p.get('temu_id') == result.temu_id), None)
-                amazon_product = next((p for p in amazon_data if p.get('amazon_id') == result.amazon_id), None)
+            enhanced_matches.append(enhanced_match)
 
-                if temu_product and amazon_product:
-                    review_items.append({
-                        "temu": {
-                            "temu_id": temu_product.get('temu_id'),
-                            "title": temu_product.get('title'),
-                            "price": temu_product.get('price'),
-                            "image_available": Path(f"temu_baby_toys_imgs/{result.temu_id}.jpg").exists()
-                        },
-                        "amazon_candidate": {
-                            "amazon_id": amazon_product.get('amazon_id'),
-                            "title": amazon_product.get('title'),
-                            "price": amazon_product.get('price'),
-                            "keywords": amazon_product.get('high_value_keywords', []),
-                            "image_available": Path(f"amazon_baby_toys_imgs/{result.amazon_id}.jpg").exists()
-                        },
-                        "match_scores": {
-                            "fuzzy": round(result.fuzzy_score, 1),
-                            "embedding": round(result.embedding_score, 3),
-                            "image": round(result.image_score, 3) if result.image_score > 0 else None,
-                            "confidence": round(result.confidence, 3)
-                        },
-                        "current_verdict": result.verdict_reason
-                    })
-
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump({"review_needed": review_items}, f, indent=2)
-
-        print(f"\nGenerated {len(review_items)} items for LLM review in {output_file}")
+        return enhanced_matches
 
 
-def main():
-    """Main execution"""
-    # Initialize matcher
-    print("Temu-Amazon Product Matcher")
-    print("=" * 50)
+def load_existing_enriched(output_file: Path) -> Tuple[List[Dict], Set[str]]:
+    """Load existing enriched matches and create a set of processed keys."""
+    if not output_file.exists():
+        return [], set()
 
-    # Ask about image matching
-    #use_images = input("\nUse image matching? (requires CLIP, y/n): ").lower() == 'y'
+    with open(output_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
 
-    matcher = ProductMatcher(use_images=True)  # skip the prompt
+    existing_matches = data.get('matches', [])
+    processed_keys = set()
 
-    # File paths
-    temu_file = "temu_products_for_analysis.json"
-    amazon_file = "amazon_products_for_analysis.json"
+    for match in existing_matches:
+        if match.get('llm_processed', False):
+            key = f"{match['temu_id']}_{match['amazon_id']}"
+            processed_keys.add(key)
 
-    # Check files exist
-    if not Path(temu_file).exists():
-        print(f"Error: {temu_file} not found!")
+    logger.info(f"Loaded {len(existing_matches)} existing matches ({len(processed_keys)} with LLM processing)")
+    return existing_matches, processed_keys
+
+
+def main(input_file: str = None,
+         output_file: str = None,
+         percentage: float = 0.35,
+         min_confidence: float = 0.6,
+         batch_size: int = 5,
+         lm_studio_url: str = LM_STUDIO_URL,
+         model_name: Optional[str] = None,
+         checkpoint_interval: int = 5):
+    """
+    Main function to run LLM re-ranking on product matches
+
+    Args:
+        input_file: Input JSON file with matches (will prompt if not provided)
+        output_file: Output file for enriched results (will be auto-generated if not provided)
+        percentage: Top percentage of matches to process (0-1)
+        min_confidence: Minimum confidence threshold
+        batch_size: Number of matches to process in parallel
+        lm_studio_url: URL of LM Studio server
+        model_name: Specific model to use (optional)
+        checkpoint_interval: Save progress every N results
+    """
+    logger.info("=== Product Match LLM Re-ranking ===")
+
+    # Get category name if files not specified
+    if not input_file or not output_file:
+        print("\nEnter the product category (e.g., 'baby toys', 'baby_toys'):")
+        print("This will look for matching results named 'matching_results_[category].json'")
+
+        category_input = input("Category name: ").strip()
+        category_name = sanitize_filename(category_input)  # Normalize to underscore format
+
+        # Construct file paths if not provided
+        if not input_file:
+            input_file = f"matching_results_{category_name}.json"
+        if not output_file:
+            output_file = f"matching_results_enriched_{category_name}.json"
+
+        # Set image directories based on category
+        image_dirs = {
+            'temu': Path(f'temu_{category_name}_imgs'),
+            'amazon': Path(f'amazon_{category_name}_imgs')
+        }
+    else:
+        # Try to extract category from input filename for image dirs
+        match = re.search(r'matching_results_(.+)\.json', input_file)
+        if match:
+            category_name = match.group(1)
+            image_dirs = {
+                'temu': Path(f'temu_{category_name}_imgs'),
+                'amazon': Path(f'amazon_{category_name}_imgs')
+            }
+        else:
+            # Default image directories
+            image_dirs = {
+                'temu': Path('temu_baby_toys_imgs'),
+                'amazon': Path('amazon_baby_toys_imgs')
+            }
+
+    # Check if input file exists
+    if not Path(input_file).exists():
+        logger.error(f"❌ Error: {input_file} not found!")
+        logger.error(f"   Make sure you've run the product matcher for '{category_name}' first.")
         return
 
-    if not Path(amazon_file).exists():
-        print(f"Error: {amazon_file} not found!")
-        return
+    # Check image directories (warning only)
+    for platform, img_dir in image_dirs.items():
+        if not img_dir.exists():
+            logger.warning(f"⚠️  Warning: {platform} images directory '{img_dir}' not found.")
 
-    # Run matching
-    print("\nStarting product matching...")
-    results = matcher.match_all_products(temu_file, amazon_file)
+    # Load matches from input
+    logger.info(f"Loading matches from {input_file}")
+    with open(input_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
 
-    # Save results
-    matcher.save_results(results)
+    current_matches = data.get('matches', [])
+    metadata = data.get('metadata', {})
 
-    # Generate LLM review batch if needed
-    review_needed = sum(1 for r in results if r.needs_review)
-    if review_needed > 0:
-        print(f"\n{review_needed} matches need review. Generating LLM batch...")
+    # Load existing enriched if present
+    output_path = Path(output_file)
+    existing_matches, existing_processed_keys = load_existing_enriched(output_path)
 
-        # Load full data for LLM batch
-        with open(temu_file, 'r', encoding='utf-8') as f:
-            temu_full = matcher._extract_products(json.load(f), 'temu')
-        with open(amazon_file, 'r', encoding='utf-8') as f:
-            amazon_full = matcher._extract_products(json.load(f), 'amazon')
+    # Initialize reranker with category-specific image directories
+    reranker = ProductMatchReranker(
+        lm_studio_url=lm_studio_url,
+        model_name=model_name,
+        image_dirs=image_dirs
+    )
 
-        matcher.generate_llm_review_batch(results, temu_full, amazon_full)
+    # Select candidates from current input
+    all_candidates = reranker.select_top_candidates(
+        current_matches,
+        percentage=percentage,
+        min_confidence=min_confidence
+    )
 
-    print("\nMatching complete!")
+    # Filter to new/unprocessed candidates
+    candidates = []
+    for candidate in all_candidates:
+        key = f"{candidate['temu_id']}_{candidate['amazon_id']}"
+        if key not in existing_processed_keys:
+            candidates.append(candidate)
+
+    logger.info(f"Found {len(candidates)} new/unprocessed candidates to process "
+                f"(skipping {len(all_candidates) - len(candidates)} already processed)")
+
+    # Create checkpoint file path specific to this output
+    checkpoint_file = output_path.with_suffix('.checkpoint.json')
+    reranker.checkpoint_file = checkpoint_file  # Store for cleanup
+
+    if candidates:
+        # Process with LLM
+        logger.info(f"Processing {len(candidates)} candidates with LLM...")
+        llm_results = reranker.run_llm_batch(
+            candidates,
+            batch_size=batch_size,
+            checkpoint_interval=checkpoint_interval
+        )
+    else:
+        llm_results = []
+        logger.info("No new candidates to process")
+
+    # Merge LLM results into current matches
+    enhanced_matches = reranker.merge_llm_results(current_matches, llm_results)
+
+    # Calculate statistics
+    llm_stats = {
+        'total_processed': sum(1 for m in enhanced_matches if m.get('llm_processed', False)),
+        'llm_same': sum(1 for m in enhanced_matches if m.get('llm_same_product', False)),
+        'llm_different': sum(
+            1 for m in enhanced_matches if m.get('llm_processed', False) and not m.get('llm_same_product', True)),
+        'average_processing_time': sum(
+            m.get('llm_processing_time', 0) for m in enhanced_matches if m.get('llm_processed', False)) / max(1, sum(
+            1 for m in enhanced_matches if m.get('llm_processed', False)))
+    }
+
+    # Update metadata
+    metadata.update({
+        'llm_enrichment': {
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'candidates_selected': len(all_candidates),
+            'new_candidates_processed': len(candidates),
+            'percentage_used': percentage,
+            'min_confidence_used': min_confidence,
+            **llm_stats
+        }
+    })
+
+    # Save final results
+    output_data = {
+        'metadata': metadata,
+        'matches': enhanced_matches
+    }
+
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(output_data, f, indent=2)
+
+    # Remove checkpoint files on successful completion
+    for checkpoint in [checkpoint_file, Path("llm_processing.checkpoint.json")]:
+        if checkpoint.exists():
+            checkpoint.unlink()
+            logger.info(f"Removed checkpoint file: {checkpoint}")
+
+    logger.info(f"\nEnrichment complete! Results saved to {output_file}")
+    logger.info(f"Total with LLM data: {llm_stats['total_processed']}")
+    logger.info(f"Same product: {llm_stats['llm_same']}")
+    logger.info(f"Different product: {llm_stats['llm_different']}")
+    logger.info(f"Average processing time: {llm_stats['average_processing_time']:.2f}s per match")
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)

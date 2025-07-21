@@ -7,15 +7,16 @@ import json
 from pathlib import Path
 from datetime import datetime
 import sys
+from typing import Optional
 
 # Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Configuration
-CSV_FILE = Path("temu_baby_toys.csv")
-IMAGES_DIR = Path("temu_baby_toys_imgs")
-OUTPUT_FILE = Path("temu_products_for_analysis.json")
+CSV_FILE = Path("temu_pikler_triangle_set.csv")
+IMAGES_DIR = Path("temu_pikler_triangle_set_imgs")
+OUTPUT_FILE = Path("temu_pikler_triangle_set_analysis.json")
 
 
 def analyze_title_for_keywords(title):
