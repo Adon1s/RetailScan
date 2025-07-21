@@ -5,7 +5,7 @@ Matches products between Temu and Amazon using multiple similarity methods
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 import numpy as np
 from dataclasses import dataclass
 from datetime import datetime
@@ -343,6 +343,14 @@ class ProductMatcher:
 
         # Always try embedding comparison for top candidates
         temu_embedding = self.get_title_embedding(temu_title)
+
+        # Precompute Temu image embedding once outside the loop to avoid redundant calls
+        temu_img_emb = None
+        if self.use_images:
+            temu_img_path = temu_img_dir / f"{temu_id}.jpg"
+            if temu_img_path.exists():
+                temu_img_emb = self.get_image_embedding(str(temu_img_path))
+
         best_match = None
         best_combined_score = 0
 
@@ -561,7 +569,9 @@ class ProductMatcher:
             temu_data: List[Dict],
             amazon_data: List[Dict],
             output_file: str = "llm_review_batch.json",
-            confidence_threshold: float = 0.7
+            confidence_threshold: float = 0.7,
+            temu_img_dir: str = None,
+            amazon_img_dir: str = None
     ) -> None:
         """Generate batch of items for LLM review"""
         review_items = []
@@ -578,14 +588,14 @@ class ProductMatcher:
                             "temu_id": temu_product.get('temu_id'),
                             "title": temu_product.get('title'),
                             "price": temu_product.get('price'),
-                            "image_available": Path(f"temu_baby_toys_imgs/{result.temu_id}.jpg").exists()
+                            "image_available": Path(f"{temu_img_dir}/{result.temu_id}.jpg").exists()
                         },
                         "amazon_candidate": {
                             "amazon_id": amazon_product.get('amazon_id'),
                             "title": amazon_product.get('title'),
                             "price": amazon_product.get('price'),
                             "keywords": amazon_product.get('high_value_keywords', []),
-                            "image_available": Path(f"amazon_baby_toys_imgs/{result.amazon_id}.jpg").exists()
+                            "image_available": Path(f"{amazon_img_dir}/{result.amazon_id}.jpg").exists()
                         },
                         "match_scores": {
                             "fuzzy": round(result.fuzzy_score, 1),
@@ -621,6 +631,14 @@ class ProductMatcher:
         self._save_caches()
 
 
+def sanitize_filename(filename: str) -> str:
+    """Sanitize string for use in filenames"""
+    # Replace spaces with underscores and remove special characters
+    sanitized = re.sub(r'[^\w\s-]', '', filename)
+    sanitized = re.sub(r'[-\s]+', '_', sanitized)
+    return sanitized.lower()
+
+
 def main():
     """Main execution"""
     # Initialize matcher
@@ -628,12 +646,13 @@ def main():
     print("=" * 50)
 
     # Get the file name part from user
-    print("\nEnter the product category (e.g., 'baby_toys', 'montessori_toys'):")
+    print("\nEnter the product category (e.g., 'baby toys', 'montessori_toys'):")
     print("This will look for analysis files named:")
     print("  - temu_[category]_analysis.json")
     print("  - amazon_[category]_analysis.json")
 
-    category_name = input("Category name: ").strip()
+    category_input = input("Category name: ").strip()
+    category_name = sanitize_filename(category_input)
 
     # Construct file paths
     temu_file = Path(f"temu_{category_name}_analysis.json")
@@ -691,7 +710,15 @@ def main():
             amazon_full = matcher._extract_products(json.load(f), 'amazon')
 
         review_file = f"llm_review_batch_{category_name}.json"
-        matcher.generate_llm_review_batch(results, temu_full, amazon_full, review_file)
+        # Pass the correct image directories to generate_llm_review_batch
+        matcher.generate_llm_review_batch(
+            results,
+            temu_full,
+            amazon_full,
+            review_file,
+            temu_img_dir=temu_img_dir,
+            amazon_img_dir=amazon_img_dir
+        )
 
     print("\nMatching complete!")
 

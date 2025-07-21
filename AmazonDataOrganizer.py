@@ -7,18 +7,56 @@ import json
 from pathlib import Path
 from datetime import datetime
 import sys
+from typing import Optional
 
-# Force UTF-8 output so Windows console won’t choke on ✓, ✗, etc.
+# Force UTF-8 output so Windows console won't choke on ✓, ✗, etc.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 # ── CONFIG ──────────────────────────────────────────────────────────────
-CSV_FILE     = Path("amazon_baby_toys.csv")
-IMAGES_DIR   = Path("amazon_baby_toys_imgs")
-OUTPUT_FILE  = Path("amazon_products_for_analysis.json")
-ID_FIELD     = "amazon_id"            # only real schema change
-SOURCE_NAME  = "Amazon Baby Toys"     # goes into metadata
+def get_file_paths():
+    """Prompt user for file name and construct paths"""
+    print("Amazon Data Analyzer for Resale")
+    print("="*50)
+
+    # Get the file name part from user
+    print("\nEnter the product category (e.g., 'baby_toys', 'montessori_toys'):")
+    print("This will look for files named 'amazon_[your_input].csv'")
+
+    file_name = input("Category name: ").strip()
+
+    # Construct the paths
+    csv_file = Path(f"amazon_{file_name}.csv")
+    images_dir = Path(f"amazon_{file_name}_imgs")
+    output_file = Path(f"amazon_{file_name}_analysis.json")
+
+    # Verify CSV file exists
+    if not csv_file.exists():
+        print(f"\n❌ Error: File '{csv_file}' not found!")
+        print(f"   Make sure you have a file named 'amazon_{file_name}.csv' in this directory.")
+        sys.exit(1)
+
+    # Check if images directory exists (warning only)
+    if not images_dir.exists():
+        print(f"\n⚠️  Warning: Images directory '{images_dir}' not found.")
+        print("   Continuing without images...")
+
+    print(f"\n✓ Found CSV file: {csv_file}")
+    if images_dir.exists():
+        print(f"✓ Found images directory: {images_dir}")
+
+    return csv_file, images_dir, output_file, file_name.replace('_', ' ').title()
+
+
+# Global variables will be set by get_file_paths()
+from typing import Optional
+
+CSV_FILE: Optional[Path] = None
+IMAGES_DIR: Optional[Path] = None
+OUTPUT_FILE: Optional[Path] = None
+SOURCE_NAME: Optional[str] = None
+ID_FIELD = "amazon_id"  # only real schema change
 
 
 # ── HELPER FUNCTIONS (unchanged) ─────────────────────────────────────────
@@ -34,7 +72,7 @@ def analyze_title_for_keywords(title):
     tl = title.lower()
     return {
         "high_value_keywords": [kw for kw in high_value_keywords if kw in tl],
-        "caution_keywords":   [kw for kw in caution_keywords if kw in tl],
+        "caution_keywords": [kw for kw in caution_keywords if kw in tl],
         "title_length": len(title),
         "word_count": len(title.split())
     }
@@ -59,37 +97,37 @@ def load_and_analyze_products():
 
     with CSV_FILE.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            # accept either old (“amazon_id”) or new (“product_id”) column
+            # accept either old ("amazon_id") or new ("product_id") column
             prod_id = row.get("amazon_id") or row.get("product_id")
             title = row["title"]
             price = float(row["price"]) if row.get("price") else 0.0
 
-            img_exists = (IMAGES_DIR / f"{prod_id}.jpg").exists()
+            img_exists = (IMAGES_DIR / f"{prod_id}.jpg").exists() if IMAGES_DIR.exists() else False
             title_info = analyze_title_for_keywords(title)
 
             products.append({
-                ID_FIELD:         prod_id,
-                "title":          title,
-                "price":          price,
-                "product_url":    row["product_url"],
-                "has_image":      img_exists,
-                "image_path":     f"{IMAGES_DIR.name}/{prod_id}.jpg" if img_exists else None,
+                ID_FIELD: prod_id,
+                "title": title,
+                "price": price,
+                "product_url": row["product_url"],
+                "has_image": img_exists,
+                "image_path": f"{IMAGES_DIR.name}/{prod_id}.jpg" if img_exists else None,
 
                 # derived fields
-                "price_category":     categorize_price_range(price),
+                "price_category": categorize_price_range(price),
                 "potential_markup_2x": price * 2 if price else "unknown",
                 "potential_markup_3x": price * 3 if price else "unknown",
                 **title_info,
 
                 "has_gift_potential": "gift" in title.lower() or "christmas" in title.lower(),
-                "is_educational":     any(k in title.lower() for k in ["educational", "learning", "development"]),
-                "is_bundle_or_set":   any(k in title.lower() for k in ["set", "bundle", "pack", "pcs", "pieces"]),
+                "is_educational": any(k in title.lower() for k in ["educational", "learning", "development"]),
+                "is_bundle_or_set": any(k in title.lower() for k in ["set", "bundle", "pack", "pcs", "pieces"]),
 
                 "resale_score_hints": {
                     "has_multiple_value_keywords": len(title_info["high_value_keywords"]) >= 2,
                     "good_price_range": 10 < price < 50,
                     "has_caution_flags": bool(title_info["caution_keywords"]),
-                    "image_available":   img_exists,
+                    "image_available": img_exists,
                 },
             })
 
@@ -97,9 +135,9 @@ def load_and_analyze_products():
 
 
 def create_llm_analysis_file(products):
-    total   = len(products)
-    img_cnt = sum(p["has_image"]          for p in products)
-    priced  = sum(p["price"] > 0          for p in products)
+    total = len(products)
+    img_cnt = sum(p["has_image"] for p in products)
+    priced = sum(p["price"] > 0 for p in products)
 
     price_distribution = {}
     for p in products:
@@ -109,7 +147,7 @@ def create_llm_analysis_file(products):
 
     analysis = {
         "metadata": {
-            "source": SOURCE_NAME,
+            "source": f"Amazon {SOURCE_NAME}",
             "analysis_date": datetime.now().isoformat(),
             "total_products": total,
             "products_with_images": img_cnt,
@@ -117,7 +155,7 @@ def create_llm_analysis_file(products):
             "price_distribution": price_distribution,
             "analysis_purpose": "Purchasability assessment for resale"
         },
-        "analysis_guidelines": {        # unchanged text
+        "analysis_guidelines": {
             "good_resale_indicators": [
                 "Price between $10-50 (good margin potential)",
                 "Educational or developmental focus",
@@ -154,10 +192,18 @@ def create_llm_analysis_file(products):
 
 
 def main():
-    print("Amazon Data Analyzer for Resale")
-    print("="*50)
+    global CSV_FILE, IMAGES_DIR, OUTPUT_FILE, SOURCE_NAME
 
-    print("Loading & analyzing products …")
+    if CSV_FILE is None:  # Standalone mode: prompt for paths
+        CSV_FILE, IMAGES_DIR, OUTPUT_FILE, SOURCE_NAME = get_file_paths()
+    else:  # Pipeline mode: derive missing globals from CSV_FILE
+        # Extract slug from CSV_FILE (e.g., 'temu_baby_toys.csv' -> 'baby_toys')
+        file_stem = CSV_FILE.stem  # 'temu_baby_toys'
+        file_name = file_stem.replace('temu_', '', 1)  # 'baby_toys' (adjust for Amazon: replace 'amazon_' instead)
+        IMAGES_DIR = Path(f"temu_{file_name}_imgs")  # Or derive from OUTPUT_FILE if needed
+        SOURCE_NAME = file_name.replace('_', ' ').title()  # 'Baby Toys'
+
+    print("\nLoading & analyzing products …")
     products = load_and_analyze_products()
     print(f" Analyzed {len(products)} products")
 
