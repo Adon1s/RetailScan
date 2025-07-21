@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 import sys
 from typing import Optional
+import re
 
 # Force UTF-8 output so Windows console won't choke on ✓, ✗, etc.
 if hasattr(sys.stdout, "reconfigure"):
@@ -18,7 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):
 def get_file_paths():
     """Prompt user for file name and construct paths"""
     print("Temu Data Analyzer for Resale")
-    print("="*50)
+    print("=" * 50)
 
     # Get the file name part from user
     print("\nEnter the product category (e.g., 'baby_toys', 'montessori_toys'):")
@@ -91,17 +92,35 @@ def categorize_price_range(price):
         return "high_ticket"
 
 
-def load_and_analyze_products():
-    """Load products and add analysis fields for LLM"""
-    products_analysis = []
+def clean_price(price_str: Optional[str]) -> float:
+    if not price_str:
+        return 0.0
+    cleaned = re.sub(r'[^\d.]', '', price_str)
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
 
+
+def load_and_analyze_products():
+    products_analysis = []
     with open(CSV_FILE, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
+        # Check required columns
+        required = {'title', 'price', 'product_url'}
+        missing = required - set(reader.fieldnames)
+        if missing:
+            print(f"❌ Missing columns: {missing}")
+            sys.exit(1)
+
         for row in reader:
-            # Basic product info  ── accepts either old (`temu_id`) or new (`product_id`) header
             temu_id = row.get('temu_id') or row.get('product_id')
-            title = row['title']
-            price = float(row['price']) if row.get('price') else 0.0
+            if not temu_id:
+                continue  # Skip rows without ID
+
+            title = row.get('title', '')
+            price = clean_price(row.get('price'))
+            product_url = row.get('product_url', '')
 
             # Check if image exists locally
             image_exists = (IMAGES_DIR / f"{temu_id}.jpg").exists() if IMAGES_DIR.exists() else False
@@ -114,7 +133,7 @@ def load_and_analyze_products():
                 'temu_id': temu_id,
                 'title': title,
                 'price': price,
-                'product_url': row['product_url'],
+                'product_url': product_url,  # Use the safe variable here
                 'has_image': image_exists,
                 'image_path': f"{IMAGES_DIR.name}/{temu_id}.jpg" if image_exists else None,
 

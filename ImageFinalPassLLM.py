@@ -44,20 +44,22 @@ class ProductMatchReranker:
     def __init__(self,
                  lm_studio_url: str = LM_STUDIO_URL,
                  model_name: Optional[str] = DEFAULT_MODEL,
-                 image_dirs: Dict[str, Path] = None):
+                 search_term: str = None):
         """
         Initialize the reranker
 
         Args:
             lm_studio_url: URL of LM Studio server
             model_name: Specific model to use (optional)
-            image_dirs: Dict with 'temu' and 'amazon' paths to image directories
+            search_term: The search term/slug for this run (new)
         """
         self.lm_studio_url = lm_studio_url
         self.model_name = model_name
-        self.image_dirs = image_dirs or {
-            'temu': Path('temu_baby_toys_imgs'),
-            'amazon': Path('amazon_baby_toys_imgs')
+        self.search_slug = sanitize_filename(
+            search_term) if search_term else 'default'  # New: Derive slug, with fallback if None
+        self.image_dirs = {
+            'temu': Path(f'temu_{self.search_slug}_imgs'),
+            'amazon': Path(f'amazon_{self.search_slug}_imgs')
         }
 
         # Try local SDK first
@@ -305,22 +307,13 @@ Respond with JSON only:
                       checkpoint_interval: int = 5) -> List[Tuple[Dict, Optional[LLMVerdict]]]:
         """
         Process candidates in batches with LLM
-
-        Args:
-            candidates: List of match candidates
-            batch_size: Number to process in parallel
-            max_workers: Max concurrent threads
-            checkpoint_interval: Save checkpoint every N results
-
-        Returns:
-            List of (match, verdict) tuples
         """
         results = []
         total = len(candidates)
         processed_count = 0
 
-        # Load checkpoint if exists
-        checkpoint_file = Path("llm_processing.checkpoint.json")
+        # New: Make checkpoint per-search-term
+        checkpoint_file = Path(f"llm_processing_{self.search_slug}.checkpoint.json")
         processed_keys = set()
 
         if checkpoint_file.exists():
@@ -340,9 +333,9 @@ Respond with JSON only:
                             verdict = None
                         results.append((match, verdict))
 
-                    logger.info(f"Loaded {len(results)} results from checkpoint")
+                    logger.info(f"Loaded {len(results)} results from checkpoint for {self.search_slug}")
             except Exception as e:
-                logger.error(f"Error loading checkpoint: {e}")
+                logger.error(f"Error loading checkpoint for {self.search_slug}: {e}")
 
         # Filter out already processed candidates
         remaining_candidates = []
@@ -352,20 +345,19 @@ Respond with JSON only:
                 remaining_candidates.append(candidate)
 
         if not remaining_candidates:
-            logger.info("All candidates already processed")
+            logger.info(f"All candidates already processed for {self.search_slug}")
             return results
 
-        logger.info(f"Processing {len(remaining_candidates)} remaining candidates (already processed: {len(processed_keys)})")
+        logger.info(f"Processing {len(remaining_candidates)} remaining candidates for {self.search_slug} (already processed: {len(processed_keys)})")
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for i in range(0, len(remaining_candidates), batch_size):
-                future_to_match = {}  # Reset for each batch
+                future_to_match = {}
                 batch = remaining_candidates[i:i + batch_size]
                 for match in batch:
                     future = executor.submit(self.analyze_single_match, match)
                     future_to_match[future] = match
 
-                # Process completed futures
                 for future in as_completed(future_to_match):
                     match, verdict = future.result()
                     results.append((match, verdict))
@@ -379,17 +371,13 @@ Respond with JSON only:
                         logger.warning(f"Failed to process {match['temu_id']}-{match['amazon_id']} "
                                        f"[{processed_count}/{len(remaining_candidates)}]")
 
-                    # Save checkpoint at intervals
                     if processed_count % checkpoint_interval == 0:
                         self._save_checkpoint(results, checkpoint_file)
 
-                # Rate limiting between batches
                 if i + batch_size < len(remaining_candidates):
                     time.sleep(1)
 
-        # Save final checkpoint
         self._save_checkpoint(results, checkpoint_file)
-
         return results
 
     def _save_checkpoint(self, results: List[Tuple[Dict, Optional[LLMVerdict]]], checkpoint_file: Path):
@@ -440,6 +428,12 @@ Respond with JSON only:
                 enhanced_match['llm_processed'] = False
 
             enhanced_matches.append(enhanced_match)
+
+        # New: Save to term-specific output file
+        output_file = Path(f"matching_results_llm_{self.search_slug}.json")
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(enhanced_matches, f, indent=2)
+        logger.info(f"Saved enhanced results to {output_file}")
 
         return enhanced_matches
 
@@ -549,7 +543,7 @@ def main(input_file: str = None,
     reranker = ProductMatchReranker(
         lm_studio_url=lm_studio_url,
         model_name=model_name,
-        image_dirs=image_dirs
+        search_term=category_name  # ← new
     )
 
     # Select candidates from current input
