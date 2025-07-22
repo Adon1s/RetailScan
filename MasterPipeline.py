@@ -36,11 +36,20 @@ def normalize_search_terms(search_terms: str) -> str:
 class IncrementalMatchingPipeline:
     """Handles incremental matching logic and comparison tracking"""
 
-    def __init__(self, log_func=print):
+    def __init__(self, log_func=print, category_slug=None):
         self.log = log_func
-        self.comparison_history_file = Path("comparison_history.json")
-        self.product_hashes_file = Path("product_hashes.json")
-        self.matching_results_file = Path("matching_results.json")
+        self.category_slug = category_slug
+
+        # Use category-specific files if category is provided
+        if category_slug:
+            self.comparison_history_file = Path(f"comparison_history_{category_slug}.json")
+            self.product_hashes_file = Path(f"product_hashes_{category_slug}.json")
+            self.matching_results_file = Path(f"matching_results_{category_slug}.json")
+        else:
+            # Fallback to global files (not recommended)
+            self.comparison_history_file = Path("comparison_history.json")
+            self.product_hashes_file = Path("product_hashes.json")
+            self.matching_results_file = Path("matching_results.json")
 
         # Load existing data
         self.comparison_history = self._load_comparison_history()
@@ -281,7 +290,7 @@ class IncrementalMatchingPipeline:
 
 
 class PipelineRunner:
-    def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=False, search_terms=None):
+    def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=True, search_terms=None):
         self.skip_scraping = skip_scraping
         self.skip_llm = skip_llm
         self.verbose = verbose
@@ -295,7 +304,7 @@ class PipelineRunner:
         # Dynamic file paths based on search terms
         self.temu_csv = Path(f"temu_{self.search_slug}.csv")
         self.amazon_csv = Path(f"amazon_{self.search_slug}.csv")
-        self.temu_json = Path(f"temu_{self.search_slug}_analysis.json")  # Changed to match standalone
+        self.temu_json = Path(f"temu_{self.search_slug}_analysis.json")
         self.amazon_json = Path(f"amazon_{self.search_slug}_analysis.json")
 
         self.start_time = time.time()
@@ -304,8 +313,8 @@ class PipelineRunner:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = self.log_dir / f"pipeline_run_{timestamp}.log"
 
-        # Initialize incremental matching handler
-        self.incremental_matcher = IncrementalMatchingPipeline(log_func=self.log)
+        # Initialize incremental matching handler WITH CATEGORY SLUG
+        self.incremental_matcher = IncrementalMatchingPipeline(log_func=self.log, category_slug=self.search_slug)
 
         # Save config for other scripts to use
         self.save_pipeline_config()
@@ -630,26 +639,34 @@ class PipelineRunner:
                     # Initialize matcher
                     matcher = ProductMatcher(use_images=True)
 
-                    # Run matching with filtered files
+                    # Run matching with filtered files AND CORRECT IMAGE DIRECTORIES
                     results = matcher.match_all_products(
                         "{temp_temu}",
-                        "{temp_amazon}"
+                        "{temp_amazon}",
+                        temu_img_dir="temu_{self.search_slug}_imgs",
+                        amazon_img_dir="amazon_{self.search_slug}_imgs"
                     )
 
                     # Save results (use temp file)
                     matcher.save_results(results, "temp_matching_results.json")
 
-                    # Generate LLM review batch if needed (for consistency with standalone)
+                    # Generate LLM review batch if needed
                     review_needed = sum(1 for r in results if r.needs_review)
                     if review_needed > 0:
                         # Load full products from filtered data
-                        temu_full = {filtered_temu}['all_products']
-                        amazon_full = {filtered_amazon}['all_products']
+                        with open("{temp_temu}", 'r') as f:
+                            temu_full = json.load(f)['all_products']
+                        with open("{temp_amazon}", 'r') as f:
+                            amazon_full = json.load(f)['all_products']
+
+                        # Pass correct image directories to generate_llm_review_batch
                         matcher.generate_llm_review_batch(
                             results,
                             temu_full,
                             amazon_full,
-                            f"llm_review_batch_{self.search_slug}.json"  # Category-specific batch file
+                            f"llm_review_batch_{self.search_slug}.json",
+                            temu_img_dir="temu_{self.search_slug}_imgs",
+                            amazon_img_dir="amazon_{self.search_slug}_imgs"
                         )
 
                     print("Matching completed successfully")
@@ -881,8 +898,9 @@ class PipelineRunner:
                     except Exception as e:
                         self.log(f"Warning: Could not delete temp results file: {e}", "WARNING")
 
-        # Check for matching results
-        if not self.check_output_files(["matching_results.json"], "Product matching"):
+        # Check for matching results - FIX: Use category-specific filename
+        category_specific_results = f"matching_results_{self.search_slug}.json"
+        if not self.check_output_files([category_specific_results], "Product matching"):
             return False
 
         # Step 6: LLM Enhancement (optional)
@@ -1027,10 +1045,10 @@ class PipelineRunner:
     def show_summary(self):
         """Show summary of results"""
         try:
-            # Try to load LLM analyzed results first
-            results_file = "matching_results_llm.json"
+            # Try to load LLM analyzed results first (category-specific)
+            results_file = f"matching_results_enriched_{self.search_slug}.json"
             if not Path(results_file).exists():
-                results_file = "matching_results.json"
+                results_file = f"matching_results_{self.search_slug}.json"
 
             with open(results_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
