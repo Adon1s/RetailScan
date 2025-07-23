@@ -1,6 +1,5 @@
 """
-Pipeline API Server
-Provides REST API endpoints for the Temu-Amazon Product Matching Pipeline
+Enhanced Pipeline API Server with Remote Access Support
 """
 from flask import Flask, request, jsonify, Response, send_file
 from flask_cors import CORS
@@ -11,9 +10,11 @@ import json
 import sys
 import os
 import time
+import socket
 from pathlib import Path
 import re
 from datetime import datetime
+import argparse
 
 app = Flask(__name__, static_folder='.')
 CORS(app)  # Enable CORS for all routes
@@ -23,6 +24,18 @@ pipeline_process = None
 pipeline_running = False
 message_queue = queue.Queue()
 pipeline_thread = None
+
+def get_local_ip():
+    """Get the local IP address of this machine"""
+    try:
+        # Connect to a remote address to determine local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception:
+        return "127.0.0.1"
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize string for use in filenames"""
@@ -113,6 +126,18 @@ def index():
     """Serve the main dashboard"""
     return send_file('PipelineDashboard.html')
 
+@app.route('/api/status')
+def status():
+    """Get server status and connection info"""
+    local_ip = get_local_ip()
+    return jsonify({
+        'status': 'running',
+        'pipeline_running': pipeline_running,
+        'local_ip': local_ip,
+        'port': request.environ.get('SERVER_PORT', 5000),
+        'timestamp': datetime.now().isoformat()
+    })
+
 @app.route('/api/pipeline/start', methods=['POST'])
 def start_pipeline():
     """Start the pipeline process"""
@@ -132,7 +157,7 @@ def start_pipeline():
         while not message_queue.empty():
             message_queue.get()
 
-        # Build command
+        # Build command - use the correct script name from your files
         cmd = [sys.executable, 'MasterPipeline.py', '--search', search_terms]
 
         if skip_scraping:
@@ -268,10 +293,36 @@ def serve_static(path):
         return send_file(path)
     return "Not found", 404
 
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser(description="Pipeline API Server")
+    parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
+    parser.add_argument('--port', type=int, default=5000, help='Port to bind to')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+
+    args = parser.parse_args()
+
+    local_ip = get_local_ip()
+
+    print("=" * 60)
     print("Starting Pipeline API Server...")
-    print("Dashboard will be available at: http://localhost:5000")
+    print("=" * 60)
+    print(f"Local access:    http://localhost:{args.port}")
+    print(f"Network access:  http://{local_ip}:{args.port}")
+    print()
+    print("For remote access from another network:")
+    print("1. Set up port forwarding on your router")
+    print("2. Use a tunneling service like ngrok:")
+    print(f"   ngrok http {args.port}")
+    print("=" * 60)
     print("Press Ctrl+C to stop the server")
 
-    # Run the Flask development server
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Run the Flask server
+    app.run(
+        host=args.host,
+        port=args.port,
+        debug=args.debug,
+        threaded=True
+    )
+
+if __name__ == '__main__':
+    main()
