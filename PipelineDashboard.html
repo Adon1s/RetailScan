@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temu-Amazon Product Matching Pipeline</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Product Matcher">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="Compare and match products between Temu and Amazon">
+
+    <!-- PWA Links -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+            transition: transform 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #2a5298;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2a5298;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        }
+
+        .options-group {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper label {
+            cursor: pointer;
+            user-select: none;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .pages-input {
+            width: 80px;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(42, 82, 152, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        .progress-section {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .progress-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .progress-bar-container {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2a5298 0%, #1e3c72 100%);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .log-output {
+            background: #1e1e1e;
+            color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+
+        .log-entry.warning {
+            color: #ffd93d;
+        }
+
+        .log-entry.success {
+            color: #6bcf7f;
+        }
+
+        .log-entry.info {
+            color: #74c0fc;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .status-indicator.running {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-indicator.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-indicator.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results-summary {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            border: 1px solid #d0d0d0;
+        }
+
+        .results-summary h3 {
+            color: #2a5298;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .result-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+
+        .result-card .value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #2a5298;
+            margin-bottom: 5px;
+        }
+
+        .result-card .label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .dashboard-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dashboard-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .options-group {
+                flex-direction: column;
+            }
+        }
+
+        /* PWA Install Banner */
+        .install-banner {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .install-banner.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .install-banner h3 {
+            margin: 0 0 10px 0;
+            color: #2a5298;
+        }
+
+        .install-banner p {
+            margin: 0 0 15px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .install-banner-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .install-banner-buttons button {
+            flex: 1;
+        }
+
+        .btn-install {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-later {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        /* PWA Mode Indicator */
+        .pwa-mode .header::after {
+            content: "PWA";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .pwa-mode .header {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛍️ Product Matching Pipeline</h1>
+            <p>Compare products between Temu and Amazon</p>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label for="searchInput">Search Terms</label>
+                <input
+                    type="text"
+                    id="searchInput"
+                    class="search-input"
+                    placeholder="e.g., baby toys, kitchen gadgets, phone accessories"
+                    value="baby toys"
+                >
+            </div>
+
+            <div class="options-group">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="skipScraping">
+                    <label for="skipScraping">Skip Scraping (use existing data)</label>
+                </div>
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="skipLLM">
+                    <label for="skipLLM">Skip LLM Analysis</label>
+                </div>
+                <div class="checkbox-wrapper">
+                    <label for="pagesInput">Pages to scrape:</label>
+                    <input type="number" id="pagesInput" class="pages-input" value="1" min="1" max="10">
+                </div>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button id="startButton" class="btn btn-primary">
+                <span>🚀</span> Start Pipeline
+            </button>
+            <button id="stopButton" class="btn btn-secondary" style="display: none;">
+                <span>⏹️</span> Stop
+            </button>
+        </div>
+
+        <div id="progressSection" class="progress-section">
+            <div class="progress-header">
+                <span class="progress-title">Pipeline Progress</span>
+                <span id="statusIndicator" class="status-indicator running">
+                    <span class="spinner"></span>
+                    Running
+                </span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+            </div>
+            <div id="currentStep" style="color: #666; margin-bottom: 10px;">Initializing...</div>
+            <div id="logOutput" class="log-output"></div>
+        </div>
+
+        <div id="resultsSummary" class="results-summary">
+            <h3>📊 Results Summary</h3>
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="value" id="totalMatches">0</div>
+                    <div class="label">Total Matches</div>
+                </div>
+                <div class="result-card">
+                    <div class="value" id="highConfidence">0</div>
+                    <div class="label">High Confidence</div>
+                </div>
+                <div class="result-card">
+                    <div class="value" id="processingTime">0s</div>
+                    <div class="label">Processing Time</div>
+                </div>
+                <div class="result-card">
+                    <div class="value" id="llmProcessed">0</div>
+                    <div class="label">LLM Processed</div>
+                </div>
+            </div>
+            <button id="dashboardButton" class="dashboard-button">
+                📈 Open Dashboard
+            </button>
+        </div>
+    </div>
+
+    <!-- PWA Install Banner -->
+    <div id="installBanner" class="install-banner">
+        <h3>📱 Install Product Matcher</h3>
+        <p>Add this app to your home screen for quick access and offline viewing of results.</p>
+        <div class="install-banner-buttons">
+            <button id="installButton" class="btn btn-install">Install App</button>
+            <button id="laterButton" class="btn btn-later">Maybe Later</button>
+        </div>
+    </div>
+
+    <script>
+        // Pipeline state management
+        let pipelineRunning = false;
+        let pipelineProcess = null;
+        let startTime = null;
+
+        // DOM elements
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const searchInput = document.getElementById('searchInput');
+        const skipScraping = document.getElementById('skipScraping');
+        const skipLLM = document.getElementById('skipLLM');
+        const pagesInput = document.getElementById('pagesInput');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const currentStep = document.getElementById('currentStep');
+        const logOutput = document.getElementById('logOutput');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const resultsSummary = document.getElementById('resultsSummary');
+        const dashboardButton = document.getElementById('dashboardButton');
+
+        // Pipeline steps for progress tracking
+        const pipelineSteps = [
+            { id: 'init', name: 'Initialization', weight: 5 },
+            { id: 'scrape_temu', name: 'Scraping Temu', weight: 20 },
+            { id: 'scrape_amazon', name: 'Scraping Amazon', weight: 20 },
+            { id: 'organize_temu', name: 'Organizing Temu Data', weight: 10 },
+            { id: 'organize_amazon', name: 'Organizing Amazon Data', weight: 10 },
+            { id: 'matching', name: 'Product Matching', weight: 20 },
+            { id: 'llm', name: 'LLM Analysis', weight: 10 },
+            { id: 'complete', name: 'Complete', weight: 5 }
+        ];
+
+        let currentStepIndex = 0;
+        let stepProgress = {};
+
+        // Initialize step progress
+        function initializeProgress() {
+            stepProgress = {};
+            pipelineSteps.forEach(step => {
+                stepProgress[step.id] = 0;
+            });
+            currentStepIndex = 0;
+            updateProgressBar();
+        }
+
+        // Calculate total progress
+        function calculateTotalProgress() {
+            let totalProgress = 0;
+            let totalWeight = 0;
+
+            pipelineSteps.forEach(step => {
+                if (skipScraping.checked && (step.id === 'scrape_temu' || step.id === 'scrape_amazon')) {
+                    // Skip these steps
+                    return;
+                }
+                if (skipLLM.checked && step.id === 'llm') {
+                    // Skip LLM step
+                    return;
+                }
+                totalProgress += (stepProgress[step.id] || 0) * step.weight;
+                totalWeight += step.weight;
+            });
+
+            return totalWeight > 0 ? (totalProgress / totalWeight) : 0;
+        }
+
+        // Update progress bar
+        function updateProgressBar() {
+            const progress = calculateTotalProgress();
+            progressBar.style.width = `${progress}%`;
+        }
+
+        // Add log entry
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // Update current step display
+        function updateCurrentStep(stepId, progress = 0) {
+            const step = pipelineSteps.find(s => s.id === stepId);
+            if (step) {
+                currentStep.textContent = `${step.name} (${Math.round(progress)}%)`;
+                stepProgress[stepId] = progress;
+                updateProgressBar();
+            }
+        }
+
+        // Parse log output to detect progress
+        function parseLogOutput(output) {
+            // Detect which step we're in based on output patterns
+            if (output.includes('Starting Temu-Amazon Product Matching Pipeline')) {
+                updateCurrentStep('init', 100);
+            } else if (output.includes('Scraping Temu products')) {
+                updateCurrentStep('scrape_temu', 50);
+            } else if (output.includes('✓') && output.includes('Temu scraping completed')) {
+                updateCurrentStep('scrape_temu', 100);
+            } else if (output.includes('Scraping Amazon products')) {
+                updateCurrentStep('scrape_amazon', 50);
+            } else if (output.includes('✓') && output.includes('Amazon scraping completed')) {
+                updateCurrentStep('scrape_amazon', 100);
+            } else if (output.includes('Organizing Temu data')) {
+                updateCurrentStep('organize_temu', 50);
+            } else if (output.includes('✓') && output.includes('Organizing Temu data completed')) {
+                updateCurrentStep('organize_temu', 100);
+            } else if (output.includes('Organizing Amazon data')) {
+                updateCurrentStep('organize_amazon', 50);
+            } else if (output.includes('✓') && output.includes('Organizing Amazon data completed')) {
+                updateCurrentStep('organize_amazon', 100);
+            } else if (output.includes('Product Matching')) {
+                updateCurrentStep('matching', 50);
+            } else if (output.includes('matching completed successfully')) {
+                updateCurrentStep('matching', 100);
+            } else if (output.includes('LLM Enhancement')) {
+                updateCurrentStep('llm', 50);
+            } else if (output.includes('LLM enhancement complete') || output.includes('Enrichment complete!')) {
+                updateCurrentStep('llm', 100);
+            } else if (output.includes('Pipeline completed')) {
+                updateCurrentStep('complete', 100);
+            }
+
+            // Detect log level
+            let logType = 'info';
+            if (output.includes('[ERROR]') || output.includes('✗')) {
+                logType = 'error';
+            } else if (output.includes('[WARNING]')) {
+                logType = 'warning';
+            } else if (output.includes('✓')) {
+                logType = 'success';
+            }
+
+            addLogEntry(output, logType);
+        }
+
+        // Start pipeline
+        async function startPipeline() {
+            if (pipelineRunning) return;
+
+            const searchTerms = searchInput.value.trim();
+            if (!searchTerms) {
+                alert('Please enter search terms');
+                return;
+            }
+
+            pipelineRunning = true;
+            startTime = Date.now();
+
+            // Update UI
+            startButton.disabled = true;
+            stopButton.style.display = 'inline-flex';
+            progressSection.style.display = 'block';
+            resultsSummary.style.display = 'none';
+            logOutput.innerHTML = '';
+
+            // Initialize progress
+            initializeProgress();
+
+            // Update status
+            statusIndicator.className = 'status-indicator running';
+            statusIndicator.innerHTML = '<span class="spinner"></span> Running';
+
+            try {
+                // Call backend API to start pipeline
+                const response = await fetch('/api/pipeline/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        searchTerms: searchTerms,
+                        skipScraping: skipScraping.checked,
+                        skipLLM: skipLLM.checked,
+                        numPages: parseInt(pagesInput.value) || 1
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start pipeline');
+                }
+
+                // Set up EventSource for real-time updates
+                const eventSource = new EventSource('/api/pipeline/stream');
+
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'log') {
+                        parseLogOutput(data.message);
+                    } else if (data.type === 'complete') {
+                        completePipeline(data.results);
+                        eventSource.close();
+                    } else if (data.type === 'error') {
+                        handlePipelineError(data.message);
+                        eventSource.close();
+                    }
+                };
+
+                eventSource.onerror = (error) => {
+                    handlePipelineError('Connection lost');
+                    eventSource.close();
+                };
+
+            } catch (error) {
+                handlePipelineError(error.message);
+            }
+        }
+
+        // Complete pipeline
+        function completePipeline(results) {
+            pipelineRunning = false;
+            const endTime = Date.now();
+            const duration = Math.round((endTime - startTime) / 1000);
+
+            // Update UI
+            startButton.disabled = false;
+            stopButton.style.display = 'none';
+
+            // Update status
+            statusIndicator.className = 'status-indicator completed';
+            statusIndicator.innerHTML = '✅ Completed';
+
+            // Show results summary
+            if (results) {
+                document.getElementById('totalMatches').textContent = results.totalMatches || 0;
+                document.getElementById('highConfidence').textContent = results.highConfidence || 0;
+                document.getElementById('processingTime').textContent = `${duration}s`;
+                document.getElementById('llmProcessed').textContent = results.llmProcessed || 0;
+
+                resultsSummary.style.display = 'block';
+            }
+
+            addLogEntry(`Pipeline completed in ${duration} seconds`, 'success');
+        }
+
+        // Handle pipeline error
+        function handlePipelineError(error) {
+            pipelineRunning = false;
+
+            // Update UI
+            startButton.disabled = false;
+            stopButton.style.display = 'none';
+
+            // Update status
+            statusIndicator.className = 'status-indicator error';
+            statusIndicator.innerHTML = '❌ Error';
+
+            addLogEntry(`Error: ${error}`, 'error');
+        }
+
+        // Stop pipeline
+        async function stopPipeline() {
+            if (!pipelineRunning) return;
+
+            try {
+                await fetch('/api/pipeline/stop', {
+                    method: 'POST'
+                });
+
+                handlePipelineError('Pipeline stopped by user');
+            } catch (error) {
+                console.error('Failed to stop pipeline:', error);
+            }
+        }
+
+        // Open dashboard
+        function openDashboard() {
+            // Open the existing dashboard in a new tab
+            // The dashboard will prompt for category on load
+            window.open('ProductMatchingDashboard.html', '_blank');
+        }
+
+        // Event listeners
+        startButton.addEventListener('click', startPipeline);
+        stopButton.addEventListener('click', stopPipeline);
+        dashboardButton.addEventListener('click', openDashboard);
+
+        // Enter key to start
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !pipelineRunning) {
+                startPipeline();
+            }
+        });
+
+        // Toggle pages input based on skip scraping
+        skipScraping.addEventListener('change', () => {
+            pagesInput.disabled = skipScraping.checked;
+        });
+
+        // For development/testing - simulate pipeline without backend
+        if (window.location.search.includes('demo=true')) {
+            // Override startPipeline for demo
+            window.startPipeline = async function() {
+                pipelineRunning = true;
+                startTime = Date.now();
+
+                startButton.disabled = true;
+                stopButton.style.display = 'inline-flex';
+                progressSection.style.display = 'block';
+                resultsSummary.style.display = 'none';
+                logOutput.innerHTML = '';
+
+                initializeProgress();
+
+                statusIndicator.className = 'status-indicator running';
+                statusIndicator.innerHTML = '<span class="spinner"></span> Running';
+
+                // Simulate pipeline steps
+                const steps = [
+                    { step: 'init', message: 'Starting Temu-Amazon Product Matching Pipeline', delay: 500 },
+                    { step: 'scrape_temu', message: 'Scraping Temu products...', delay: 2000 },
+                    { step: 'scrape_temu', message: '✓ Temu scraping completed successfully', delay: 2000 },
+                    { step: 'scrape_amazon', message: 'Scraping Amazon products...', delay: 2000 },
+                    { step: 'scrape_amazon', message: '✓ Amazon scraping completed successfully', delay: 2000 },
+                    { step: 'organize_temu', message: 'Organizing Temu data...', delay: 1000 },
+                    { step: 'organize_temu', message: '✓ Organizing Temu data completed successfully', delay: 1000 },
+                    { step: 'organize_amazon', message: 'Organizing Amazon data...', delay: 1000 },
+                    { step: 'organize_amazon', message: '✓ Organizing Amazon data completed successfully', delay: 1000 },
+                    { step: 'matching', message: 'Running Product Matching...', delay: 2000 },
+                    { step: 'matching', message: 'Incremental matching completed successfully', delay: 2000 },
+                    { step: 'llm', message: 'Running LLM Enhancement...', delay: 2000 },
+                    { step: 'llm', message: 'Enrichment complete!', delay: 2000 },
+                    { step: 'complete', message: 'Pipeline completed', delay: 500 }
+                ];
+
+                for (let i = 0; i < steps.length; i++) {
+                    if (!pipelineRunning) break;
+
+                    await new Promise(resolve => setTimeout(resolve, steps[i].delay));
+                    parseLogOutput(steps[i].message);
+                }
+
+                if (pipelineRunning) {
+                    completePipeline({
+                        totalMatches: 142,
+                        highConfidence: 87,
+                        llmProcessed: 50
+                    });
+                }
+            };
+        }
+    </script>
+</body>
+</html>
