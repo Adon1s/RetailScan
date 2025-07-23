@@ -935,29 +935,7 @@ class PipelineRunner:
         # Step 7: Open Dashboard
         self.log("\n--- STEP 7: Opening Dashboard ---")
 
-        dashboard_path = Path("ProductMatchingDashboard.html")
-        if not dashboard_path.exists():
-            self.log("Dashboard file not found.", "ERROR")
-            return False
-
-        if self.use_http_server:
-            # Option: Use HTTP server (for CORS or API needs)
-            self.serve_dashboard_with_http()
-        else:
-            # Default: Use file:// protocol (simpler and more reliable)
-            file_url = dashboard_path.absolute().as_uri()
-            self.log(f"Opening dashboard: {file_url}")
-
-            try:
-                webbrowser.open(file_url)
-
-                # Show instructions for HTTP server if needed
-                self.log("\nDashboard opened in browser.")
-                self.log("If you see CORS errors or need HTTP features:")
-                self.log("  Run: python run_pipeline.py --step serve")
-                self.log("  Or: python -m http.server 8000")
-            except Exception as e:
-                self.log(f"Error opening dashboard: {e}", "ERROR")
+        self.serve_dashboard_with_http()
 
         # Clean up config file
         try:
