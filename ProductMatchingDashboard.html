@@ -835,135 +835,83 @@
     }
 
     // Render matches
-    function renderMatches() {
-        const grid = document.getElementById('match-grid');
+    // Replace the renderMatches function in your SingleItemResultsDashboard.html with this:
 
-        if (filteredMatches.length === 0) {
-            grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
-            return;
-        }
+function renderMatches() {
+    const grid = document.getElementById('matches-grid');
 
-        grid.innerHTML = filteredMatches.map(match => {
-            const confClass = getConfidenceClass(match.confidence);
-            const matchKey = `${match.temu_id}_${match.amazon_id}`;
-            const decision = decisions[matchKey];
-            const temuPrice = match.temu_price || match.price || 0;
-            const amazonPrice = match.amazon_price || 0;
-            const priceDiff = amazonPrice - temuPrice;
-            const priceDiffPercent = temuPrice ? ((priceDiff / temuPrice) * 100).toFixed(0) : 0;
+    if (filteredMatches.length === 0) {
+        grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
+        return;
+    }
 
-            return `
-                <div class="match-card ${confClass}" data-match-key="${matchKey}">
-                    <div class="match-header">
-                        <div class="header-left">
-                            <span class="confidence-badge">
-                                ${Math.min(match.confidence * 100, 100).toFixed(1)}% Confidence
-                            </span>
-                            ${getLLMBadge(match)}
-                            <span style="font-size: 12px; color: #666;">
-                                ${match.match_method || 'Combined Match'}
-                            </span>
-                        </div>
-                        <div style="font-size: 12px; color: #666;">
-                            ${decision ? `Decision: ${decision}` : 'Pending Review'}
-                        </div>
+    grid.innerHTML = filteredMatches.map((match, index) => {
+        const confClass = getConfidenceClass(match.confidence);
+        const confidencePercent = (match.confidence * 100).toFixed(1);
+        const platformClass = match.platform.toLowerCase();
+        const imageDir = match.platform === 'temu' ? 'temu' : 'amazon';
+
+        // Get category from metadata for image paths
+        const category = matchData.metadata?.category || 'products';
+
+        return `
+            <div class="match-card">
+                <div class="confidence-indicator ${confClass}"></div>
+                <span class="platform-badge ${platformClass}-badge">${match.platform.toUpperCase()}</span>
+
+                <div class="match-image" data-match-index="${index}">
+                    <img src="./${imageDir}_${category}_imgs/${match.product_id}.jpg"
+                         alt="${match.title}"
+                         data-match-index="${index}" />
+                    <span class="price-tag">$${match.price.toFixed(2)}</span>
+                </div>
+
+                <div class="match-content">
+                    <div class="match-title">${match.title}</div>
+
+                    <div class="match-scores">
+                        ${match.scores ? `
+                            ${match.scores.fuzzy ? `<span class="score-chip">📝 Text: ${match.scores.fuzzy.toFixed(0)}%</span>` : ''}
+                            ${match.scores.embedding ? `<span class="score-chip">🧠 Semantic: ${(match.scores.embedding * 100).toFixed(0)}%</span>` : ''}
+                            ${match.scores.image ? `<span class="score-chip">🖼️ Image: ${(match.scores.image * 100).toFixed(0)}%</span>` : ''}
+                        ` : ''}
                     </div>
 
-                    <div class="match-content">
-                        <!-- Temu Product -->
-                        <div class="product-section">
-                            <div class="product-image">
-                                <span class="platform-badge temu-badge">TEMU</span>
-                                <span class="price-tag">$${temuPrice.toFixed(2)}</span>
-                                <img src="./temu_${CATEGORY_SLUG}_imgs/${match.temu_id}.jpg"
-                                     alt="${match.temu_title || 'Temu Product'}"
-                                     onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
-                            </div>
-                            <div class="product-title">${match.temu_title || `Temu Product ${match.temu_id}`}</div>
-                            <div class="product-id">ID: ${match.temu_id}</div>
-                            <a href="https://www.temu.com/search_result.html?search_key=${match.temu_id}" target="_blank" style="font-size: 12px; color: #667eea;">Search on Temu →</a>
-                        </div>
-
-                        <!-- Match Scores -->
-                        <div class="match-scores">
-                            ${match.scores ? `
-                                <div class="score-item">
-                                    <div class="score-label">Text Match</div>
-                                    <div class="score-bar">
-                                        <div class="score-fill" style="width: ${Math.min(match.scores.fuzzy || 0, 100)}%"></div>
-                                    </div>
-                                    <div class="score-value">${Math.min(match.scores.fuzzy || 0, 100).toFixed(1)}%</div>
-                                </div>
-                                <div class="score-item">
-                                    <div class="score-label">Semantic</div>
-                                    <div class="score-bar">
-                                        <div class="score-fill" style="width: ${Math.min((match.scores.embedding || 0) * 100, 100)}%"></div>
-                                    </div>
-                                    <div class="score-value">${Math.min((match.scores.embedding || 0) * 100, 100).toFixed(1)}%</div>
-                                </div>
-                                <div class="score-item">
-                                    <div class="score-label">Image</div>
-                                    <div class="score-bar">
-                                        <div class="score-fill" style="width: ${Math.min((match.scores.image || 0) * 100, 100)}%"></div>
-                                    </div>
-                                    <div class="score-value">${Math.min((match.scores.image || 0) * 100, 100).toFixed(1)}%</div>
-                                </div>
-                            ` : `
-                                <div class="score-value" style="font-size: 16px;">
-                                    ${Math.min(match.confidence * 100, 100).toFixed(1)}%
-                                </div>
-                                <div style="font-size: 12px; color: #666;">Overall Match</div>
-                            `}
-
-                            ${match.llm_processed && match.llm_image_similarity !== undefined ? `
-                                <div class="llm-score-section">
-                                    <div class="score-item">
-                                        <div class="score-label">LLM Image Sim</div>
-                                        <div class="score-bar">
-                                            <div class="score-fill" style="width: ${Math.min(match.llm_image_similarity * 100, 100)}%; background: #8b5cf6;"></div>
-                                        </div>
-                                        <div class="score-value">${Math.min(match.llm_image_similarity * 100, 100).toFixed(1)}%</div>
-                                    </div>
-                                </div>
-                            ` : ''}
-
-                            <div class="price-diff ${priceDiff < 0 ? 'negative' : ''}">
-                                Price Diff: ${priceDiff >= 0 ? '+' : ''}$${priceDiff.toFixed(2)}
-                                <br>
-                                <small>(${priceDiffPercent >= 0 ? '+' : ''}${priceDiffPercent}%)</small>
-                            </div>
-                        </div>
-
-                        <!-- Amazon Product -->
-                        <div class="product-section">
-                            <div class="product-image">
-                                <span class="platform-badge amazon-badge">AMAZON</span>
-                                <span class="price-tag">$${amazonPrice.toFixed(2)}</span>
-                                <img src="./amazon_${CATEGORY_SLUG}_imgs/${match.amazon_id}.jpg"
-                                     alt="${match.amazon_title || 'Amazon Product'}"
-                                     onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
-                            </div>
-                            <div class="product-title">${match.amazon_title || `Amazon Product ${match.amazon_id}`}</div>
-                            <div class="product-id">ASIN: ${match.amazon_id}</div>
-                            <a href="https://www.amazon.com/dp/${match.amazon_id}" target="_blank" style="font-size: 12px; color: #667eea;">View on Amazon →</a>
-                        </div>
+                    <div class="confidence-display">
+                        <div class="confidence-value">${confidencePercent}%</div>
+                        <div class="confidence-label">Match Confidence</div>
                     </div>
+
+                    ${match.llm_processed !== undefined ? `
+                        <div class="llm-badge ${match.llm_same_product ? 'llm-same' : 'llm-different'}">
+                            ${match.llm_same_product ? '✓ Same Product' : '✗ Different Product'}
+                        </div>
+                    ` : ''}
 
                     <div class="match-actions">
-                        <button class="btn-approve" onclick="setDecision('${matchKey}', 'approved')">
-                            ✓ Approve Match
-                        </button>
-                        <button class="btn-uncertain" onclick="setDecision('${matchKey}', 'uncertain')">
-                            ? Uncertain
-                        </button>
-                        <button class="btn-reject" onclick="setDecision('${matchKey}', 'rejected')">
-                            ✗ Reject Match
-                        </button>
+                        ${match.platform === 'amazon' ?
+                            `<a href="https://www.amazon.com/dp/${match.product_id}" target="_blank">View on Amazon</a>` :
+                            `<a href="https://www.temu.com/search_result.html?search_key=${match.product_id}" target="_blank">Search on Temu</a>`
+                        }
                     </div>
                 </div>
-            `;
-        }).join('');
-    }
+            </div>
+        `;
+    }).join('');
+
+    // After rendering, add error handlers to all images
+    setTimeout(() => {
+        const images = grid.querySelectorAll('.match-image img');
+        images.forEach(img => {
+            img.onerror = function() {
+                const matchIndex = this.getAttribute('data-match-index');
+                const matchImageDiv = this.parentElement;
+                matchImageDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No Image</div>' +
+                                         matchImageDiv.querySelector('.price-tag').outerHTML;
+            };
+        });
+    }, 100);
+}
 
     // Set decision for a match
     function setDecision(matchKey, decision) {
