@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single Item Product Matcher</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Item Matcher">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="Find matching products across Temu and Amazon">
+
+    <!-- PWA Links -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+            transition: transform 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #2a5298;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #2a5298;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border: 2px dashed #d0d0d0;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #f0f0f0;
+            border-color: #2a5298;
+        }
+
+        .file-input-label.has-file {
+            border-style: solid;
+            border-color: #2a5298;
+            background: #e8f0fe;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .file-icon {
+            font-size: 2em;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .image-preview {
+            display: none;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .options-group {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .select-wrapper {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .select-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+
+        .select-input:focus {
+            outline: none;
+            border-color: #2a5298;
+            background: white;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper label {
+            cursor: pointer;
+            user-select: none;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(42, 82, 152, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        .progress-section {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .progress-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .progress-bar-container {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2a5298 0%, #1e3c72 100%);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .log-output {
+            background: #1e1e1e;
+            color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+
+        .log-entry.warning {
+            color: #ffd93d;
+        }
+
+        .log-entry.success {
+            color: #6bcf7f;
+        }
+
+        .log-entry.info {
+            color: #74c0fc;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .status-indicator.running {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-indicator.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-indicator.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .matches-list {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            border: 1px solid #d0d0d0;
+        }
+
+        .matches-list h3 {
+            color: #2a5298;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .match-item {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .match-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+        }
+
+        .match-info {
+            flex: 1;
+        }
+
+        .match-platform {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .match-platform.temu {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .match-platform.amazon {
+            background: #ff9500;
+            color: white;
+        }
+
+        .match-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .match-details {
+            display: flex;
+            gap: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .match-confidence {
+            text-align: right;
+            min-width: 100px;
+        }
+
+        .confidence-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #2a5298;
+        }
+
+        .confidence-label {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .match-item {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .match-confidence {
+                margin-top: 15px;
+                text-align: center;
+            }
+        }
+
+        /* URL input option */
+        .input-type-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-type-toggle button {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .input-type-toggle button.active {
+            background: #2a5298;
+            color: white;
+            border-color: #2a5298;
+        }
+
+        .url-input-wrapper {
+            display: none;
+        }
+
+        .results-summary {
+            background: #f0f7ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #d0e7ff;
+        }
+
+        .results-stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .stat-item {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #2a5298;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Single Item Product Matcher</h1>
+            <p>Find matching products across Temu and Amazon</p>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label for="titleInput">Product Title</label>
+                <input
+                    type="text"
+                    id="titleInput"
+                    class="text-input"
+                    placeholder="e.g., Wooden Rainbow Stacking Toy"
+                    value=""
+                >
+            </div>
+
+            <div class="input-group">
+                <label>Product Image</label>
+                <div class="input-type-toggle">
+                    <button id="fileInputBtn" class="active">Upload File</button>
+                    <button id="urlInputBtn">Image URL</button>
+                </div>
+
+                <div id="fileInputWrapper" class="file-input-wrapper">
+                    <input type="file" id="imageInput" accept="image/*">
+                    <label for="imageInput" class="file-input-label" id="fileInputLabel">
+                        <div class="file-info">
+                            <span class="file-icon">📷</span>
+                            <span class="file-name">Click to upload image or drag & drop</span>
+                        </div>
+                    </label>
+                    <div id="imagePreview" class="image-preview">
+                        <img id="previewImg" src="" alt="Preview">
+                    </div>
+                </div>
+
+                <div id="urlInputWrapper" class="url-input-wrapper">
+                    <input
+                        type="url"
+                        id="imageUrlInput"
+                        class="text-input"
+                        placeholder="https://example.com/product-image.jpg"
+                    >
+                </div>
+            </div>
+
+            <div class="options-group">
+                <div class="select-wrapper">
+                    <label for="categorySelect">Product Category</label>
+                    <select id="categorySelect" class="select-input">
+                        <option value="">Select a category...</option>
+                        <option value="baby_toys">Baby Toys</option>
+                        <option value="kitchen_gadgets">Kitchen Gadgets</option>
+                        <option value="phone_accessories">Phone Accessories</option>
+                        <option value="home_decor">Home Decor</option>
+                        <option value="fitness_equipment">Fitness Equipment</option>
+                        <option value="pet_supplies">Pet Supplies</option>
+                        <option value="custom">Custom (enter below)</option>
+                    </select>
+                </div>
+                <div class="select-wrapper">
+                    <label for="customCategory">Custom Category</label>
+                    <input
+                        type="text"
+                        id="customCategory"
+                        class="text-input"
+                        placeholder="Enter custom category"
+                        disabled
+                    >
+                </div>
+            </div>
+
+            <div class="options-group">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="useImages" checked>
+                    <label for="useImages">Use image matching (requires CLIP)</label>
+                </div>
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="useLLM" checked>
+                    <label for="useLLM">Use LLM re-ranking</label>
+                </div>
+                <div class="select-wrapper" style="max-width: 150px;">
+                    <label for="topNInput">Top matches</label>
+                    <input type="number" id="topNInput" class="text-input" value="20" min="5" max="100">
+                </div>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button id="findMatchesBtn" class="btn btn-primary">
+                <span>🔎</span> Find Matches
+            </button>
+            <button id="clearBtn" class="btn btn-secondary">
+                <span>🗑️</span> Clear
+            </button>
+        </div>
+
+        <div id="progressSection" class="progress-section">
+            <div class="progress-header">
+                <span class="progress-title">Matching Progress</span>
+                <span id="statusIndicator" class="status-indicator running">
+                    <span class="spinner"></span>
+                    Processing
+                </span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+            </div>
+            <div id="currentStep" style="color: #666; margin-bottom: 10px;">Initializing...</div>
+            <div id="logOutput" class="log-output"></div>
+        </div>
+
+        <div id="matchesList" class="matches-list">
+            <h3>📊 Match Results</h3>
+            <div id="resultsSummary" class="results-summary">
+                <div class="results-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalMatches">0</div>
+                        <div class="stat-label">Total Matches</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="temuMatches">0</div>
+                        <div class="stat-label">Temu</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="amazonMatches">0</div>
+                        <div class="stat-label">Amazon</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="processingTime">0s</div>
+                        <div class="stat-label">Time</div>
+                    </div>
+                </div>
+            </div>
+            <div id="matchesContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let isProcessing = false;
+        let selectedFile = null;
+        let inputType = 'file';
+        let startTime = null;
+        let matchResults = null; // Store results for saving
+
+        // DOM elements
+        const titleInput = document.getElementById('titleInput');
+        const imageInput = document.getElementById('imageInput');
+        const imageUrlInput = document.getElementById('imageUrlInput');
+        const fileInputLabel = document.getElementById('fileInputLabel');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const categorySelect = document.getElementById('categorySelect');
+        const customCategory = document.getElementById('customCategory');
+        const useImages = document.getElementById('useImages');
+        const useLLM = document.getElementById('useLLM');
+        const topNInput = document.getElementById('topNInput');
+        const findMatchesBtn = document.getElementById('findMatchesBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const currentStep = document.getElementById('currentStep');
+        const logOutput = document.getElementById('logOutput');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const matchesList = document.getElementById('matchesList');
+        const matchesContainer = document.getElementById('matchesContainer');
+
+        // Input type toggle
+        const fileInputBtn = document.getElementById('fileInputBtn');
+        const urlInputBtn = document.getElementById('urlInputBtn');
+        const fileInputWrapper = document.getElementById('fileInputWrapper');
+        const urlInputWrapper = document.getElementById('urlInputWrapper');
+
+        // Matching steps for progress tracking
+        const matchingSteps = [
+            { id: 'init', name: 'Initialization', weight: 10 },
+            { id: 'prepare', name: 'Preparing Item', weight: 15 },
+            { id: 'load', name: 'Loading Products', weight: 15 },
+            { id: 'match', name: 'Finding Matches', weight: 30 },
+            { id: 'llm', name: 'LLM Re-ranking', weight: 25 },
+            { id: 'complete', name: 'Complete', weight: 5 }
+        ];
+
+        let currentStepIndex = 0;
+        let stepProgress = {};
+
+        // Initialize step progress
+        function initializeProgress() {
+            stepProgress = {};
+            matchingSteps.forEach(step => {
+                stepProgress[step.id] = 0;
+            });
+            currentStepIndex = 0;
+            updateProgressBar();
+        }
+
+        // Calculate total progress
+        function calculateTotalProgress() {
+            let totalProgress = 0;
+            let totalWeight = 0;
+
+            matchingSteps.forEach(step => {
+                if (!useLLM.checked && step.id === 'llm') {
+                    return;
+                }
+                totalProgress += (stepProgress[step.id] || 0) * step.weight;
+                totalWeight += step.weight;
+            });
+
+            return totalWeight > 0 ? (totalProgress / totalWeight) : 0;
+        }
+
+        // Update progress bar
+        function updateProgressBar() {
+            const progress = calculateTotalProgress();
+            progressBar.style.width = `${progress}%`;
+        }
+
+        // Add log entry
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // Update current step display
+        function updateCurrentStep(stepId, progress = 0) {
+            const step = matchingSteps.find(s => s.id === stepId);
+            if (step) {
+                currentStep.textContent = `${step.name} (${Math.round(progress)}%)`;
+                stepProgress[stepId] = progress;
+                updateProgressBar();
+            }
+        }
+
+        // Save results to server
+        async function saveResultsToServer(data) {
+            try {
+                const response = await fetch('/api/single-item/save-results', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save results');
+                }
+
+                const result = await response.json();
+                return result.filename;
+            } catch (error) {
+                console.error('Error saving results:', error);
+                // Fallback to client-side save
+                return saveResultsLocally(data);
+            }
+        }
+
+        // Fallback: Save results locally
+        function saveResultsLocally(data) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            const category = categorySelect.value === 'custom' ? customCategory.value : categorySelect.value;
+            const filename = `single_item_matches_${category}_${timestamp}.json`;
+
+            // Create a blob with the JSON data
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+            // Create a temporary download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            return filename;
+        }
+
+        // Open results dashboard
+        function openResultsDashboard(filename) {
+            // Open the results dashboard with the filename as a URL parameter
+            const resultsUrl = `SingleItemResultsDashboard.html?file=${encodeURIComponent(filename)}`;
+            window.open(resultsUrl, '_blank');
+            addLogEntry('Opening results dashboard...', 'info');
+        }
+
+        // Handle file input
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                fileInputLabel.classList.add('has-file');
+                fileInputLabel.querySelector('.file-name').textContent = file.name;
+
+                // Preview image
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Drag and drop
+        fileInputLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileInputLabel.style.borderColor = '#2a5298';
+        });
+
+        fileInputLabel.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileInputLabel.style.borderColor = '#d0d0d0';
+        });
+
+        fileInputLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInputLabel.style.borderColor = '#d0d0d0';
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                imageInput.files = e.dataTransfer.files;
+                imageInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Input type toggle
+        fileInputBtn.addEventListener('click', () => {
+            inputType = 'file';
+            fileInputBtn.classList.add('active');
+            urlInputBtn.classList.remove('active');
+            fileInputWrapper.style.display = 'block';
+            urlInputWrapper.style.display = 'none';
+        });
+
+        urlInputBtn.addEventListener('click', () => {
+            inputType = 'url';
+            urlInputBtn.classList.add('active');
+            fileInputBtn.classList.remove('active');
+            urlInputWrapper.style.display = 'block';
+            fileInputWrapper.style.display = 'none';
+        });
+
+        // Category selection
+        categorySelect.addEventListener('change', () => {
+            customCategory.disabled = categorySelect.value !== 'custom';
+            if (categorySelect.value !== 'custom') {
+                customCategory.value = '';
+            }
+        });
+
+        // Clear form
+        function clearForm() {
+            titleInput.value = '';
+            imageInput.value = '';
+            imageUrlInput.value = '';
+            selectedFile = null;
+            fileInputLabel.classList.remove('has-file');
+            fileInputLabel.querySelector('.file-name').textContent = 'Click to upload image or drag & drop';
+            imagePreview.style.display = 'none';
+            categorySelect.value = '';
+            customCategory.value = '';
+            customCategory.disabled = true;
+            progressSection.style.display = 'none';
+            matchesList.style.display = 'none';
+            logOutput.innerHTML = '';
+            matchesContainer.innerHTML = '';
+            matchResults = null;
+        }
+
+        // Display matches
+        function displayMatches(matches) {
+            matchesContainer.innerHTML = '';
+
+            matches.forEach((match, index) => {
+                const matchItem = document.createElement('div');
+                matchItem.className = 'match-item';
+
+                const platformClass = match.platform.toLowerCase();
+                const confidencePercent = (match.confidence * 100).toFixed(1);
+
+                matchItem.innerHTML = `
+                    <div class="match-info">
+                        <span class="match-platform ${platformClass}">${match.platform.toUpperCase()}</span>
+                        <div class="match-title">${match.title}</div>
+                        <div class="match-details">
+                            <span>💰 $${match.price.toFixed(2)}</span>
+                            <span>🏷️ ID: ${match.product_id}</span>
+                            ${match.image_available ? '<span>🖼️ Image available</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="match-confidence">
+                        <div class="confidence-value">${confidencePercent}%</div>
+                        <div class="confidence-label">Confidence</div>
+                    </div>
+                `;
+
+                matchesContainer.appendChild(matchItem);
+            });
+        }
+
+        // Find matches
+        async function findMatches() {
+            if (isProcessing) return;
+
+            // Validate inputs
+            const title = titleInput.value.trim();
+            if (!title) {
+                alert('Please enter a product title');
+                return;
+            }
+
+            let imageSource = null;
+            if (inputType === 'file' && selectedFile) {
+                imageSource = selectedFile;
+            } else if (inputType === 'url') {
+                imageSource = imageUrlInput.value.trim();
+                if (!imageSource) {
+                    alert('Please enter an image URL');
+                    return;
+                }
+            } else {
+                alert('Please provide a product image');
+                return;
+            }
+
+            const category = categorySelect.value === 'custom'
+                ? customCategory.value.trim()
+                : categorySelect.value;
+
+            if (!category) {
+                alert('Please select or enter a category');
+                return;
+            }
+
+            isProcessing = true;
+            startTime = Date.now();
+
+            // Update UI
+            findMatchesBtn.disabled = true;
+            progressSection.style.display = 'block';
+            matchesList.style.display = 'none';
+            logOutput.innerHTML = '';
+
+            // Initialize progress
+            initializeProgress();
+
+            // Update status
+            statusIndicator.className = 'status-indicator running';
+            statusIndicator.innerHTML = '<span class="spinner"></span> Processing';
+
+            try {
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('category', category);
+                formData.append('useImages', useImages.checked);
+                formData.append('topN', topNInput.value);
+
+                if (inputType === 'file') {
+                    formData.append('image', selectedFile);
+                } else {
+                    formData.append('imageUrl', imageSource);
+                }
+
+                // Initial progress updates
+                updateCurrentStep('init', 100);
+                addLogEntry('Initializing Single Item Matcher...', 'info');
+
+                updateCurrentStep('prepare', 50);
+                addLogEntry('Preparing user item embeddings...', 'info');
+
+                // Make API call
+                const response = await fetch('/api/single-item/match', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to find matches');
+                }
+
+                const data = await response.json();
+
+                // Check for errors in response
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Update progress based on response
+                updateCurrentStep('prepare', 100);
+                addLogEntry('✓ Item prepared successfully', 'success');
+
+                updateCurrentStep('load', 100);
+                addLogEntry(`✓ Loaded ${data.metadata?.total_products_checked || 0} products`, 'success');
+
+                updateCurrentStep('match', 100);
+                addLogEntry(`✓ Found ${data.matches?.length || 0} potential matches`, 'success');
+
+                // LLM re-ranking if enabled
+                if (useLLM.checked && data.matches && data.matches.length > 0) {
+                    updateCurrentStep('llm', 50);
+                    addLogEntry('Running LLM re-ranking...', 'info');
+
+                    try {
+                        // Call LLM API
+                        const llmResponse = await fetch('/api/single-item/rerank', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                matches: data.matches,
+                                userItem: data.input_item,
+                                category: category,
+                                tempImagePath: data.temp_image_path || ''
+                            })
+                        });
+
+                        if (llmResponse.ok) {
+                            const llmData = await llmResponse.json();
+                            if (llmData.matches) {
+                                data.matches = llmData.matches;
+                                updateCurrentStep('llm', 100);
+                                addLogEntry('✓ LLM re-ranking complete', 'success');
+                            } else {
+                                updateCurrentStep('llm', 100);
+                                addLogEntry('⚠ LLM re-ranking unavailable, using basic scores', 'warning');
+                            }
+                        } else {
+                            updateCurrentStep('llm', 100);
+                            addLogEntry('⚠ LLM re-ranking failed, using basic scores', 'warning');
+                        }
+                    } catch (llmError) {
+                        console.error('LLM error:', llmError);
+                        updateCurrentStep('llm', 100);
+                        addLogEntry('⚠ LLM re-ranking error, using basic scores', 'warning');
+                    }
+                }
+
+                updateCurrentStep('complete', 100);
+                matchResults = data; // Store results
+                completeMatching(data);
+
+            } catch (error) {
+                console.error('Matching error:', error);
+                handleError(error.message);
+            }
+        }
+
+        // Complete matching
+        async function completeMatching(data) {
+            isProcessing = false;
+            const endTime = Date.now();
+            const duration = Math.round((endTime - startTime) / 1000);
+
+            // Update UI
+            findMatchesBtn.disabled = false;
+
+            // Update status
+            statusIndicator.className = 'status-indicator completed';
+            statusIndicator.innerHTML = '✅ Completed';
+
+            // Update summary
+            const temuCount = data.matches.filter(m => m.platform === 'temu').length;
+            const amazonCount = data.matches.filter(m => m.platform === 'amazon').length;
+
+            document.getElementById('totalMatches').textContent = data.matches.length;
+            document.getElementById('temuMatches').textContent = temuCount;
+            document.getElementById('amazonMatches').textContent = amazonCount;
+            document.getElementById('processingTime').textContent = `${duration}s`;
+
+            // Display matches
+            displayMatches(data.matches.slice(0, 5)); // Show top 5
+            matchesList.style.display = 'block';
+
+            addLogEntry(`Matching completed in ${duration} seconds`, 'success');
+
+            // Save results to server
+            addLogEntry('Saving results to file...', 'info');
+            const filename = await saveResultsToServer(data);
+            addLogEntry(`Results saved to ${filename}`, 'success');
+
+            // Open results dashboard
+            setTimeout(() => {
+                openResultsDashboard(filename);
+            }, 1000);
+        }
+
+        // Handle error
+        function handleError(error) {
+            isProcessing = false;
+
+            // Update UI
+            findMatchesBtn.disabled = false;
+
+            // Update status
+            statusIndicator.className = 'status-indicator error';
+            statusIndicator.innerHTML = '❌ Error';
+
+            addLogEntry(`Error: ${error}`, 'error');
+        }
+
+        // Event listeners
+        findMatchesBtn.addEventListener('click', findMatches);
+        clearBtn.addEventListener('click', clearForm);
+
+        // Enter key to search
+        titleInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !isProcessing) {
+                findMatches();
+            }
+        });
+    </script>
+</body>
+</html>
