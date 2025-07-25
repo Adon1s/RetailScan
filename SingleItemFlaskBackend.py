@@ -2,13 +2,14 @@
 Flask Backend for Single Item Product Matcher
 Provides API endpoints for the web dashboard
 """
+from CORScanner.cors_scan import results
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_cors import CORS
 import os
 import tempfile
 from pathlib import Path
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from werkzeug.utils import secure_filename
 import re
@@ -87,6 +88,23 @@ def serve_static(filename):
     return "File not found", 404
 
 
+# Create a static uploads directory
+UPLOAD_FOLDER = 'static/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Add this near the top of your Flask app, after imports
+UPLOAD_FOLDER = 'static/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+
+# Add route to serve uploaded files
+@app.route('/static/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
 # Main matching endpoint
 @app.route('/api/single-item/match', methods=['POST'])
 def match_single_item():
@@ -110,18 +128,20 @@ def match_single_item():
         # Handle image input (file upload or URL)
         image_path = None
         temp_file_path = None
+        web_accessible_path = None  # Add this
 
         # Check for uploaded file
         if 'image' in request.files:
             file = request.files['image']
             if file and file.filename and allowed_file(file.filename):
-                # Save uploaded file temporarily
+                # Save uploaded file to static directory
                 filename = secure_filename(file.filename)
-                temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{datetime.now().timestamp()}_{filename}")
+                timestamp_filename = f"upload_{datetime.now().timestamp()}_{filename}"
+                temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], timestamp_filename)
                 file.save(temp_file_path)
                 image_path = temp_file_path
-                # Track for cleanup later (not immediately)
-                temp_files_to_cleanup.add(temp_file_path)
+                # Store web-accessible path
+                web_accessible_path = f"/static/uploads/{timestamp_filename}"
                 logger.info(f"Saved uploaded image to: {temp_file_path}")
 
         # Check for image URL
@@ -152,6 +172,16 @@ def match_single_item():
 
             # Add success flag
             results['success'] = True
+
+            # IMPORTANT: Ensure input_item is in results with accessible image path
+            if 'input_item' not in results:
+                results['input_item'] = {}
+
+            results['input_item'].update({
+                'title': title,
+                'image_path': web_accessible_path if web_accessible_path else image_path,  # Use web path
+                'category': category
+            })
 
             # Store the temp file path in results for LLM reranking
             if temp_file_path:
@@ -247,7 +277,6 @@ def rerank_with_llm():
         return jsonify({'error': str(e)}), 500
 
 
-# Save results endpoint
 @app.route('/api/single-item/save-results', methods=['POST'])
 def save_results():
     """Save match results to file"""
@@ -256,6 +285,9 @@ def save_results():
 
         if not data:
             return jsonify({'error': 'No data provided'}), 400
+
+        # Make sure input_item is preserved in the saved data
+        # This ensures the web-accessible image path is saved
 
         # Generate filename
         metadata = data.get('metadata', {})
@@ -341,6 +373,42 @@ def not_found(e):
 @app.errorhandler(500)
 def internal_error(e):
     return jsonify({'error': 'Internal server error'}), 500
+
+
+def cleanup_old_uploads(max_age_hours=24):
+    """Remove uploads older than specified hours"""
+    try:
+        upload_dir = app.config['UPLOAD_FOLDER']
+        if not os.path.exists(upload_dir):
+            return
+
+        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+
+        for filename in os.listdir(upload_dir):
+            if filename.startswith('.'):  # Skip hidden files
+                continue
+
+            filepath = os.path.join(upload_dir, filename)
+            if os.path.isfile(filepath):
+                file_time = datetime.fromtimestamp(os.path.getmtime(filepath))
+                if file_time < cutoff_time:
+                    try:
+                        os.remove(filepath)
+                        logger.info(f"Cleaned up old upload: {filename}")
+                    except Exception as e:
+                        logger.error(f"Error removing {filename}: {e}")
+
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+
+
+# Run cleanup occasionally before requests
+@app.before_request
+def before_request_cleanup():
+    """Run cleanup occasionally before requests"""
+    import random
+    if random.random() < 0.01:  # 1% chance
+        cleanup_old_uploads()
 
 
 # Main entry point

@@ -788,27 +788,37 @@
 
         // Save results to server
         async function saveResultsToServer(data) {
-            try {
-                const response = await fetch('/api/single-item/save-results', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to save results');
-                }
-
-                const result = await response.json();
-                return result.filename;
-            } catch (error) {
-                console.error('Error saving results:', error);
-                // Fallback to client-side save
-                return saveResultsLocally(data);
+    try {
+        // Ensure input_item is included in the data
+        const saveData = {
+            ...data,
+            input_item: {
+                title: titleInput.value.trim(),
+                image_path: data.input_item?.image_path || null,
+                category: categorySelect.value === 'custom' ? customCategory.value : categorySelect.value
             }
+        };
+
+        const response = await fetch('/api/single-item/save-results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(saveData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save results');
         }
+
+        const result = await response.json();
+        return result.filename;
+    } catch (error) {
+        console.error('Error saving results:', error);
+        // Fallback to client-side save
+        return saveResultsLocally(data);
+    }
+}
 
         // Fallback: Save results locally
         function saveResultsLocally(data) {

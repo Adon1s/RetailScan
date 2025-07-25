@@ -550,10 +550,23 @@
             search: ''
         };
 
+        // Helper function to decode HTML entities
+        function decodeHtmlEntities(text) {
+            const textArea = document.createElement('textarea');
+            textArea.innerHTML = text;
+            return textArea.value;
+        }
+
         // Get filename from URL parameter
         function getFileFromURL() {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get('file');
+        }
+
+        function escapeHtml(str = '') {
+            return str.replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+            );
         }
 
         // Load file automatically
@@ -608,6 +621,12 @@
                 matchData = response;
                 matches = matchData.matches || [];
 
+                // Decode HTML entities in match titles
+                matches = matches.map(match => ({
+                    ...match,
+                    title: decodeHtmlEntities(match.title)
+                }));
+
                 // Display input item info
                 displayInputItem();
 
@@ -653,7 +672,7 @@
             const metadata = matchData.metadata || {};
 
             document.getElementById('input-item-section').style.display = 'block';
-            document.getElementById('input-title').textContent = inputItem.title || 'Untitled Item';
+            document.getElementById('input-title').textContent = decodeHtmlEntities(inputItem.title || 'Untitled Item');
 
             // Set image
             const imgElement = document.getElementById('input-img');
@@ -820,53 +839,55 @@
                 const confidencePercent = (match.confidence * 100).toFixed(1);
                 const platformClass = match.platform.toLowerCase();
                 const imageDir = match.platform === 'temu' ? 'temu' : 'amazon';
+                const safeTitle = escapeHtml(match.title || '');
+                const priceText = (typeof match.price === 'number') ? match.price.toFixed(2) : '0.00';
 
                 // Get category from metadata for image paths
                 const category = matchData.metadata?.category || 'products';
 
-                return `
-                    <div class="match-card">
-                        <div class="confidence-indicator ${confClass}"></div>
-                        <span class="platform-badge ${platformClass}-badge">${match.platform.toUpperCase()}</span>
+        return `
+            <div class="match-card">
+                <div class="confidence-indicator ${confClass}"></div>
+                <span class="platform-badge ${platformClass}-badge">${match.platform.toUpperCase()}</span>
 
-                        <div class="match-image">
-                            <img src="./${imageDir}_${category}_imgs/${match.product_id}.jpg"
-                                 alt="${match.title}"
-                                 onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=\"padding: 20px; text-align: center; color: #999;\">No Image</div>'" />
-                            <span class="price-tag">$${match.price.toFixed(2)}</span>
-                        </div>
+                <div class="match-image">
+                    <img src="./${imageDir}_${category}_imgs/${match.product_id}.jpg"
+                         alt="${safeTitle}"
+                         onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=&quot;padding:20px;text-align:center;color:#999;&quot;>No Image</div>'" />
+                    <span class="price-tag">$${priceText}</span>
+                </div>
 
-                        <div class="match-content">
-                            <div class="match-title">${match.title}</div>
+                <div class="match-content">
+                    <div class="match-title">${safeTitle}</div>
 
-                            <div class="match-scores">
-                                ${match.scores ? `
-                                    ${match.scores.fuzzy ? `<span class="score-chip">📝 Text: ${match.scores.fuzzy.toFixed(0)}%</span>` : ''}
-                                    ${match.scores.embedding ? `<span class="score-chip">🧠 Semantic: ${(match.scores.embedding * 100).toFixed(0)}%</span>` : ''}
-                                    ${match.scores.image ? `<span class="score-chip">🖼️ Image: ${(match.scores.image * 100).toFixed(0)}%</span>` : ''}
-                                ` : ''}
-                            </div>
-
-                            <div class="confidence-display">
-                                <div class="confidence-value">${confidencePercent}%</div>
-                                <div class="confidence-label">Match Confidence</div>
-                            </div>
-
-                            ${match.llm_processed !== undefined ? `
-                                <div class="llm-badge ${match.llm_same_product ? 'llm-same' : 'llm-different'}">
-                                    ${match.llm_same_product ? '✓ Same Product' : '✗ Different Product'}
-                                </div>
-                            ` : ''}
-
-                            <div class="match-actions">
-                                ${match.platform === 'amazon' ?
-                                    `<a href="https://www.amazon.com/dp/${match.product_id}" target="_blank">View on Amazon</a>` :
-                                    `<a href="https://www.temu.com/search_result.html?search_key=${match.product_id}" target="_blank">Search on Temu</a>`
-                                }
-                            </div>
-                        </div>
+                    <div class="match-scores">
+                        ${match.scores ? `
+                            ${match.scores.fuzzy ? `<span class="score-chip">📝 Text: ${match.scores.fuzzy.toFixed(0)}%</span>` : ''}
+                            ${match.scores.embedding ? `<span class="score-chip">🧠 Semantic: ${(match.scores.embedding * 100).toFixed(0)}%</span>` : ''}
+                            ${match.scores.image ? `<span class="score-chip">🖼️ Image: ${(match.scores.image * 100).toFixed(0)}%</span>` : ''}
+                        ` : ''}
                     </div>
-                `;
+
+                    <div class="confidence-display">
+                        <div class="confidence-value">${confidencePercent}%</div>
+                        <div class="confidence-label">Match Confidence</div>
+                    </div>
+
+                    ${match.llm_processed !== undefined ? `
+                        <div class="llm-badge ${match.llm_same_product ? 'llm-same' : 'llm-different'}">
+                            ${match.llm_same_product ? '✓ Same Product' : '✗ Different Product'}
+                        </div>
+                    ` : ''}
+
+                    <div class="match-actions">
+                        ${match.platform === 'amazon'
+                            ? `<a href="https://www.amazon.com/dp/${match.product_id}" target="_blank">View on Amazon</a>`
+                            : `<a href="https://www.temu.com/search_result.html?search_key=${match.product_id}" target="_blank">Search on Temu</a>`
+                        }
+                    </div>
+                </div>
+            </div>
+            `;
             }).join('');
         }
 
