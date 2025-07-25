@@ -684,6 +684,8 @@
         let inputType = 'file';
         let startTime = null;
         let matchResults = null; // Store results for saving
+        // Pre-opened window reference to avoid popup blockers
+        let resultsWindow = null;
 
         // DOM elements
         const titleInput = document.getElementById('titleInput');
@@ -828,9 +830,18 @@
 
         // Open results dashboard
         function openResultsDashboard(filename) {
-            // Open the results dashboard with the filename as a URL parameter
             const resultsUrl = `SingleItemResultsDashboard.html?file=${encodeURIComponent(filename)}`;
-            window.open(resultsUrl, '_blank');
+            if (resultsWindow && !resultsWindow.closed) {
+                resultsWindow.location.href = resultsUrl;
+            } else {
+                const newWin = window.open(resultsUrl, '_blank');
+                if (newWin) {
+                    resultsWindow = newWin;
+                } else {
+                    // Popup blocked: fallback to same-tab navigation
+                    window.location.href = resultsUrl;
+                }
+            }
             addLogEntry('Opening results dashboard...', 'info');
         }
 
@@ -1132,10 +1143,8 @@
             const filename = await saveResultsToServer(data);
             addLogEntry(`Results saved to ${filename}`, 'success');
 
-            // Open results dashboard
-            setTimeout(() => {
-                openResultsDashboard(filename);
-            }, 1000);
+            // Open results dashboard immediately (window already pre-opened)
+            openResultsDashboard(filename);
         }
 
         // Handle error
@@ -1153,7 +1162,16 @@
         }
 
         // Event listeners
-        findMatchesBtn.addEventListener('click', findMatches);
+        findMatchesBtn.addEventListener('click', () => {
+            // Pre-open a blank tab while we still have user activation
+            if (!resultsWindow || resultsWindow.closed) {
+                resultsWindow = window.open('', '_blank');
+                if (resultsWindow) {
+                    resultsWindow.document.write('<p style="font-family:sans-serif;padding:1rem">Processing…</p>');
+                }
+            }
+            findMatches();
+        });
         clearBtn.addEventListener('click', clearForm);
 
         // Enter key to search
