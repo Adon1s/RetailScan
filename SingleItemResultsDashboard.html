@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single Item Match Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Input Item Display */
+        .input-item-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .input-item-header {
+            font-size: 20px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-item-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .input-image {
+            width: 100%;
+            height: 300px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .input-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .input-details {
+            flex: 1;
+        }
+
+        .input-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            line-height: 1.3;
+        }
+
+        .input-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .meta-item {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .meta-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Controls */
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        select, input, button {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:hover, input:hover, button:hover {
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        /* Match Grid */
+        .matches-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .match-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .match-card:hover {
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .confidence-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .confidence-high {
+            background: #10b981;
+        }
+
+        .confidence-medium {
+            background: #f59e0b;
+        }
+
+        .confidence-low {
+            background: #ef4444;
+        }
+
+        .platform-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 12px;
+            color: white;
+            z-index: 1;
+        }
+
+        .temu-badge {
+            background: #ff6b6b;
+        }
+
+        .amazon-badge {
+            background: #ff9500;
+        }
+
+        .match-image {
+            width: 100%;
+            height: 200px;
+            background: #f0f0f0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .match-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .price-tag {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .match-content {
+            padding: 15px;
+        }
+
+        .match-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 10px;
+            height: 40px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .match-scores {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .score-chip {
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .confidence-display {
+            text-align: center;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .confidence-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .confidence-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .match-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .match-actions a {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .match-actions a:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        /* LLM Badge */
+        .llm-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .llm-same {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .llm-different {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+        }
+
+        /* Export section */
+        .export-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .input-item-content {
+                grid-template-columns: 1fr;
+            }
+
+            .matches-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>Single Item Match Results</h1>
+            <p style="margin-top: 8px;">
+                Review products that match your input item across Temu and Amazon platforms.
+            </p>
+            <div class="stats-grid" id="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-matches">0</div>
+                    <div class="stat-label">Total Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="temu-matches">0</div>
+                    <div class="stat-label">Temu Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="amazon-matches">0</div>
+                    <div class="stat-label">Amazon Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="high-confidence">0</div>
+                    <div class="stat-label">High Confidence (≥80%)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="processing-time">0s</div>
+                    <div class="stat-label">Processing Time</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Item Display -->
+        <div class="input-item-section" id="input-item-section" style="display: none;">
+            <div class="input-item-header">
+                <span>🔍</span> Your Search Item
+            </div>
+            <div class="input-item-content">
+                <div class="input-image" id="input-image">
+                    <img src="" alt="Input item" id="input-img">
+                </div>
+                <div class="input-details">
+                    <div class="input-title" id="input-title"></div>
+                    <div class="input-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Category:</span>
+                            <span id="input-category"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Search Date:</span>
+                            <span id="search-date"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Products Checked:</span>
+                            <span id="products-checked"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Image Matching:</span>
+                            <span id="image-matching"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label for="sort-select">Sort By</label>
+                <select id="sort-select">
+                    <option value="confidence-desc">Confidence (High to Low)</option>
+                    <option value="confidence-asc">Confidence (Low to High)</option>
+                    <option value="price-asc">Price (Low to High)</option>
+                    <option value="price-desc">Price (High to Low)</option>
+                    <option value="platform">Platform</option>
+                    <option value="final-confidence">LLM Adjusted Score</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="filter-platform">Platform</label>
+                <select id="filter-platform">
+                    <option value="all">All Platforms</option>
+                    <option value="temu">Temu Only</option>
+                    <option value="amazon">Amazon Only</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="filter-confidence">Confidence Level</label>
+                <select id="filter-confidence">
+                    <option value="all">All Matches</option>
+                    <option value="high">High (≥80%)</option>
+                    <option value="medium">Medium (60-80%)</option>
+                    <option value="low">Low (<60%)</option>
+                    <option value="llm-same">LLM: Same Product</option>
+                    <option value="llm-different">LLM: Different Product</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="min-confidence">Min Confidence %</label>
+                <input type="number" id="min-confidence" min="0" max="100" step="5" value="0" style="width: 100px;">
+            </div>
+
+            <div class="control-group">
+                <label for="search-input">Search Products</label>
+                <input type="text" id="search-input" placeholder="Search by title or ID..." style="width: 250px;">
+            </div>
+
+            <button id="export-results" style="margin-left: auto;">
+                Export Results
+            </button>
+        </div>
+
+        <!-- Matches Grid -->
+        <div id="matches-grid" class="matches-grid">
+            <div class="loading">Loading matches...</div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="export-section" id="export-section" style="display: none;">
+            <h3>Export Options</h3>
+            <p>Export <span id="filtered-count">0</span> filtered matches</p>
+            <button onclick="exportCSV()" style="margin: 10px;">Export as CSV</button>
+            <button onclick="exportJSON()" style="margin: 10px;">Export as JSON</button>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let matchData = null;
+        let matches = [];
+        let filteredMatches = [];
+        let currentSort = 'confidence-desc';
+        let currentFilters = {
+            platform: 'all',
+            confidence: 'all',
+            minConfidence: 0,
+            search: ''
+        };
+
+        // Get filename from URL parameter
+        function getFileFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('file');
+        }
+
+        // Load file automatically
+        async function loadFile(filename) {
+            try {
+                const response = await fetch(filename);
+                if (!response.ok) throw new Error('File not found');
+                return await response.json();
+            } catch (error) {
+                // Try with .json extension if not provided
+                if (!filename.endsWith('.json')) {
+                    try {
+                        const response = await fetch(filename + '.json');
+                        if (!response.ok) throw new Error('File not found');
+                        return await response.json();
+                    } catch (e) {
+                        throw new Error('File not found');
+                    }
+                }
+                throw error;
+            }
+        }
+
+        // Initialize dashboard
+        async function init() {
+            try {
+                // Check for filename in URL
+                const filename = getFileFromURL();
+
+                let response = null;
+
+                if (filename) {
+                    // Try to load the file automatically
+                    try {
+                        response = await loadFile(filename);
+                        console.log(`Loaded file: ${filename}`);
+                    } catch (error) {
+                        console.error(`Failed to load file from URL: ${filename}`);
+                        response = await promptForFile();
+                    }
+                } else {
+                    // Fall back to prompting
+                    response = await promptForFile();
+                }
+
+                if (!response) {
+                    document.getElementById('matches-grid').innerHTML =
+                        '<div class="empty-state">No matches file selected. Please refresh and select a file.</div>';
+                    return;
+                }
+
+                matchData = response;
+                matches = matchData.matches || [];
+
+                // Display input item info
+                displayInputItem();
+
+                // Update stats
+                updateStats();
+
+                // Apply initial filters and render
+                applyFilters();
+                renderMatches();
+
+                // Setup event listeners
+                setupEventListeners();
+
+            } catch (error) {
+                console.error('Error loading matches:', error);
+                document.getElementById('matches-grid').innerHTML =
+                    '<div class="empty-state">Error loading match results. Please ensure the file exists.</div>';
+            }
+        }
+
+        // Prompt for file (fallback if URL parameter fails)
+        async function promptForFile() {
+            const filename = prompt(
+                "Enter the single item matches filename:\n" +
+                "(e.g., single_item_matches_baby_toys_20240110_103000.json)"
+            );
+
+            if (!filename) return null;
+
+            try {
+                return await loadFile(filename);
+            } catch (error) {
+                alert('File not found. Please check the filename and try again.');
+                return null;
+            }
+        }
+
+        // Display input item information
+        function displayInputItem() {
+            if (!matchData.input_item) return;
+
+            const inputItem = matchData.input_item;
+            const metadata = matchData.metadata || {};
+
+            document.getElementById('input-item-section').style.display = 'block';
+            document.getElementById('input-title').textContent = inputItem.title || 'Untitled Item';
+
+            // Set image
+            const imgElement = document.getElementById('input-img');
+            if (inputItem.image_path) {
+                imgElement.src = inputItem.image_path;
+                imgElement.onerror = function() {
+                    this.style.display = 'none';
+                    this.parentElement.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Image not available</div>';
+                };
+            } else {
+                document.getElementById('input-image').innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No image provided</div>';
+            }
+
+            // Set metadata
+            document.getElementById('input-category').textContent = metadata.category || 'N/A';
+            document.getElementById('search-date').textContent =
+                metadata.timestamp ? new Date(metadata.timestamp).toLocaleDateString() : 'N/A';
+            document.getElementById('products-checked').textContent = metadata.total_products_checked || 0;
+            document.getElementById('image-matching').textContent = metadata.use_images ? 'Enabled' : 'Disabled';
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('sort-select').addEventListener('change', (e) => {
+                currentSort = e.target.value;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('filter-platform').addEventListener('change', (e) => {
+                currentFilters.platform = e.target.value;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('filter-confidence').addEventListener('change', (e) => {
+                currentFilters.confidence = e.target.value;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('min-confidence').addEventListener('input', (e) => {
+                currentFilters.minConfidence = parseFloat(e.target.value) || 0;
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                currentFilters.search = e.target.value.toLowerCase();
+                applyFilters();
+                renderMatches();
+            });
+
+            document.getElementById('export-results').addEventListener('click', () => {
+                document.getElementById('export-section').style.display = 'block';
+                document.getElementById('filtered-count').textContent = filteredMatches.length;
+            });
+        }
+
+        // Update statistics
+        function updateStats() {
+            const metadata = matchData.metadata || {};
+            const temuCount = matches.filter(m => m.platform === 'temu').length;
+            const amazonCount = matches.filter(m => m.platform === 'amazon').length;
+            const highConf = matches.filter(m => m.confidence >= 0.8).length;
+
+            document.getElementById('total-matches').textContent = matches.length;
+            document.getElementById('temu-matches').textContent = temuCount;
+            document.getElementById('amazon-matches').textContent = amazonCount;
+            document.getElementById('high-confidence').textContent = highConf;
+
+            // Calculate processing time if available
+            if (metadata.timestamp) {
+                // This would need actual start/end times in real implementation
+                document.getElementById('processing-time').textContent = 'N/A';
+            }
+        }
+
+        // Get confidence class
+        function getConfidenceClass(confidence) {
+            if (confidence >= 0.8) return 'confidence-high';
+            if (confidence >= 0.6) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        // Apply filters and sorting
+        function applyFilters() {
+            filteredMatches = [...matches];
+
+            // Platform filter
+            if (currentFilters.platform !== 'all') {
+                filteredMatches = filteredMatches.filter(m => m.platform === currentFilters.platform);
+            }
+
+            // Confidence level filter
+            if (currentFilters.confidence !== 'all') {
+                switch (currentFilters.confidence) {
+                    case 'high':
+                        filteredMatches = filteredMatches.filter(m => m.confidence >= 0.8);
+                        break;
+                    case 'medium':
+                        filteredMatches = filteredMatches.filter(m => m.confidence >= 0.6 && m.confidence < 0.8);
+                        break;
+                    case 'low':
+                        filteredMatches = filteredMatches.filter(m => m.confidence < 0.6);
+                        break;
+                    case 'llm-same':
+                        filteredMatches = filteredMatches.filter(m => m.llm_same_product === true);
+                        break;
+                    case 'llm-different':
+                        filteredMatches = filteredMatches.filter(m => m.llm_same_product === false);
+                        break;
+                }
+            }
+
+            // Minimum confidence filter
+            filteredMatches = filteredMatches.filter(m => m.confidence * 100 >= currentFilters.minConfidence);
+
+            // Search filter
+            if (currentFilters.search) {
+                filteredMatches = filteredMatches.filter(m => {
+                    const searchStr = currentFilters.search;
+                    return (
+                        m.product_id.toLowerCase().includes(searchStr) ||
+                        m.title.toLowerCase().includes(searchStr)
+                    );
+                });
+            }
+
+            // Apply sorting
+            filteredMatches.sort((a, b) => {
+                switch (currentSort) {
+                    case 'confidence-desc':
+                        return b.confidence - a.confidence;
+                    case 'confidence-asc':
+                        return a.confidence - b.confidence;
+                    case 'price-asc':
+                        return (a.price || 0) - (b.price || 0);
+                    case 'price-desc':
+                        return (b.price || 0) - (a.price || 0);
+                    case 'platform':
+                        return a.platform.localeCompare(b.platform);
+                    case 'final-confidence':
+                        const aFinal = a.final_confidence !== undefined ? a.final_confidence : a.confidence;
+                        const bFinal = b.final_confidence !== undefined ? b.final_confidence : b.confidence;
+                        return bFinal - aFinal;
+                    default:
+                        return 0;
+                }
+            });
+        }
+
+        // Render matches
+        function renderMatches() {
+            const grid = document.getElementById('matches-grid');
+
+            if (filteredMatches.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
+                return;
+            }
+
+            grid.innerHTML = filteredMatches.map(match => {
+                const confClass = getConfidenceClass(match.confidence);
+                const confidencePercent = (match.confidence * 100).toFixed(1);
+                const platformClass = match.platform.toLowerCase();
+                const imageDir = match.platform === 'temu' ? 'temu' : 'amazon';
+
+                // Get category from metadata for image paths
+                const category = matchData.metadata?.category || 'products';
+
+                return `
+                    <div class="match-card">
+                        <div class="confidence-indicator ${confClass}"></div>
+                        <span class="platform-badge ${platformClass}-badge">${match.platform.toUpperCase()}</span>
+
+                        <div class="match-image">
+                            <img src="./${imageDir}_${category}_imgs/${match.product_id}.jpg"
+                                 alt="${match.title}"
+                                 onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=\"padding: 20px; text-align: center; color: #999;\">No Image</div>'" />
+                            <span class="price-tag">$${match.price.toFixed(2)}</span>
+                        </div>
+
+                        <div class="match-content">
+                            <div class="match-title">${match.title}</div>
+
+                            <div class="match-scores">
+                                ${match.scores ? `
+                                    ${match.scores.fuzzy ? `<span class="score-chip">📝 Text: ${match.scores.fuzzy.toFixed(0)}%</span>` : ''}
+                                    ${match.scores.embedding ? `<span class="score-chip">🧠 Semantic: ${(match.scores.embedding * 100).toFixed(0)}%</span>` : ''}
+                                    ${match.scores.image ? `<span class="score-chip">🖼️ Image: ${(match.scores.image * 100).toFixed(0)}%</span>` : ''}
+                                ` : ''}
+                            </div>
+
+                            <div class="confidence-display">
+                                <div class="confidence-value">${confidencePercent}%</div>
+                                <div class="confidence-label">Match Confidence</div>
+                            </div>
+
+                            ${match.llm_processed !== undefined ? `
+                                <div class="llm-badge ${match.llm_same_product ? 'llm-same' : 'llm-different'}">
+                                    ${match.llm_same_product ? '✓ Same Product' : '✗ Different Product'}
+                                </div>
+                            ` : ''}
+
+                            <div class="match-actions">
+                                ${match.platform === 'amazon' ?
+                                    `<a href="https://www.amazon.com/dp/${match.product_id}" target="_blank">View on Amazon</a>` :
+                                    `<a href="https://www.temu.com/search_result.html?search_key=${match.product_id}" target="_blank">Search on Temu</a>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Export functions
+        function exportCSV() {
+            const headers = ['platform', 'product_id', 'title', 'price', 'confidence', 'match_method', 'fuzzy_score', 'embedding_score', 'image_score', 'llm_verdict'];
+
+            const rows = filteredMatches.map(m => [
+                m.platform,
+                m.product_id,
+                `"${m.title.replace(/"/g, '""')}"`,
+                m.price.toFixed(2),
+                m.confidence.toFixed(3),
+                m.match_method || '',
+                m.scores?.fuzzy || '',
+                m.scores?.embedding || '',
+                m.scores?.image || '',
+                m.llm_same_product !== undefined ? (m.llm_same_product ? 'same' : 'different') : ''
+            ]);
+
+            const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `single_item_matches_export_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportJSON() {
+            const exportData = {
+                input_item: matchData.input_item,
+                metadata: matchData.metadata,
+                filtered_matches: filteredMatches
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `single_item_matches_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
