@@ -19,6 +19,31 @@ import shutil
 # Import the single item matcher (make sure it's in the same directory)
 from SingleItemMatcher import SingleItemMatcher, sanitize_filename
 
+"""
+Flask Backend for Single Item Product Matcher
+Provides API endpoints for the web dashboard
+"""
+from flask import Flask, request, jsonify, send_from_directory, render_template_string
+from flask_cors import CORS
+import os
+import tempfile
+from pathlib import Path
+import json
+from datetime import datetime, timedelta
+import logging
+from werkzeug.utils import secure_filename
+import re
+import atexit
+import shutil
+import subprocess
+import sys
+import textwrap
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
+# Import the single item matcher (make sure it's in the same directory)
+from SingleItemMatcher import SingleItemMatcher, sanitize_filename
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -73,10 +98,10 @@ def initialize_matcher(use_images=True):
 def serve_dashboard():
     """Serve the main dashboard"""
     # Try to serve the existing HTML file
-    if os.path.exists('SingleItemProductMatchingDashboard.html'):
-        return send_from_directory('.', 'SingleItemProductMatchingDashboard.html')
+    if os.path.exists('ProductSearchDashboard.html'):
+        return send_from_directory('.', 'ProductSearchDashboard.html')
     else:
-        return "Dashboard HTML file not found. Please ensure SingleItemProductMatchingDashboard.html is in the same directory.", 404
+        return "Dashboard HTML file not found. Please ensure ProductSearchDashboard.html is in the same directory.", 404
 
 
 # Serve static files (for images, CSS, JS if needed)
@@ -93,16 +118,206 @@ UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Add this near the top of your Flask app, after imports
-UPLOAD_FOLDER = 'static/uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 
 # Add route to serve uploaded files
 @app.route('/static/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+def run_scraper_with_input(scraper_script: str, search_terms: str, num_pages: int, platform: str):
+    """Run a scraper with predefined inputs"""
+    wrapper_file = Path(f"temp_{platform}_scraper_wrapper.py")
+
+    wrapper_code = textwrap.dedent(f'''
+        import subprocess
+        import sys
+
+        # Prepare inputs for the scraper
+        inputs = "{search_terms}\\n{num_pages}\\n"
+
+        # Run the actual scraper with inputs
+        result = subprocess.run(
+            [sys.executable, "{scraper_script}"],
+            input=inputs,
+            text=True,
+            capture_output=True,
+            encoding='utf-8'
+        )
+
+        # Forward the output
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+
+        # Exit with same code
+        sys.exit(result.returncode)
+    ''')
+
+    try:
+        with open(wrapper_file, 'w', encoding='utf-8') as f:
+            f.write(wrapper_code)
+
+        result = subprocess.run(
+            [sys.executable, str(wrapper_file)],
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
+        )
+
+        return result.returncode == 0, result.stdout, result.stderr
+
+    finally:
+        if wrapper_file.exists():
+            wrapper_file.unlink()
+
+
+def run_data_organizer(organizer_script: str, category: str, platform: str):
+    """Run data organizer for a specific category"""
+    wrapper_file = Path(f"temp_{platform}_organizer_wrapper.py")
+
+    wrapper_code = textwrap.dedent(f'''
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, ".")
+
+        if "{platform}" == "temu":
+            import TemuDataOrganizer
+            TemuDataOrganizer.CSV_FILE = Path("temu_{category}.csv")
+            TemuDataOrganizer.IMAGES_DIR = Path("temu_{category}_imgs")
+            TemuDataOrganizer.OUTPUT_FILE = Path("temu_{category}_analysis.json")
+            TemuDataOrganizer.SOURCE_NAME = "{category}".replace('_', ' ').title()
+            TemuDataOrganizer.main()
+        else:
+            import AmazonDataOrganizer
+            AmazonDataOrganizer.CSV_FILE = Path("amazon_{category}.csv")
+            AmazonDataOrganizer.IMAGES_DIR = Path("amazon_{category}_imgs")
+            AmazonDataOrganizer.OUTPUT_FILE = Path("amazon_{category}_analysis.json")
+            AmazonDataOrganizer.SOURCE_NAME = "{category}".replace('_', ' ').title()
+            AmazonDataOrganizer.main()
+    ''')
+
+    try:
+        with open(wrapper_file, 'w', encoding='utf-8') as f:
+            f.write(wrapper_code)
+
+        result = subprocess.run(
+            [sys.executable, str(wrapper_file)],
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
+        )
+
+        return result.returncode == 0
+
+    finally:
+        if wrapper_file.exists():
+            wrapper_file.unlink()
+
+
+@app.route('/api/single-item/scrape', methods=['POST'])
+def scrape_fresh_data():
+    """Run scrapers for fresh data"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        search_term = data.get('searchTerm', '').strip()
+        category = data.get('category', '').strip()
+        num_pages = data.get('numPages', 1)
+
+        if not search_term:
+            return jsonify({'error': 'Search term is required'}), 400
+
+        if not category:
+            return jsonify({'error': 'Category is required'}), 400
+
+        # Sanitize category for file paths
+        category_slug = sanitize_filename(category)
+
+        logger.info(f"Starting fresh scrape - Search: {search_term}, Category: {category_slug}, Pages: {num_pages}")
+
+        # Track results
+        results = {
+            'temu_success': False,
+            'amazon_success': False,
+            'temu_count': 0,
+            'amazon_count': 0
+        }
+
+        # Run scrapers in parallel
+        def run_scraper_thread(platform: str, script: str):
+            try:
+                success, stdout, stderr = run_scraper_with_input(
+                    script,
+                    search_term,
+                    num_pages,
+                    platform
+                )
+
+                if success:
+                    # Count products from CSV
+                    csv_file = Path(f"{platform}_{category_slug}.csv")
+                    if csv_file.exists():
+                        import csv
+                        with open(csv_file, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            count = sum(1 for row in reader)
+                            results[f'{platform}_count'] = count
+
+                    results[f'{platform}_success'] = True
+                    logger.info(f"{platform.capitalize()} scraping completed successfully")
+                else:
+                    logger.error(f"{platform.capitalize()} scraping failed: {stderr}")
+
+            except Exception as e:
+                logger.error(f"Error running {platform} scraper: {str(e)}")
+
+        # Run scrapers in parallel
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(run_scraper_thread, 'temu', 'TemuScraper.py'): 'temu',
+                executor.submit(run_scraper_thread, 'amazon', 'AmazonScraper.py'): 'amazon'
+            }
+
+            for future in as_completed(futures):
+                platform = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Exception in {platform} scraper thread: {e}")
+
+        # Check if at least one scraper succeeded
+        if not results['temu_success'] and not results['amazon_success']:
+            return jsonify({'error': 'Both scrapers failed'}), 500
+
+        # Run data organizers
+        logger.info("Running data organizers...")
+
+        if results['temu_success']:
+            if not run_data_organizer('TemuDataOrganizer.py', category_slug, 'temu'):
+                logger.warning("Temu data organizer failed")
+
+        if results['amazon_success']:
+            if not run_data_organizer('AmazonDataOrganizer.py', category_slug, 'amazon'):
+                logger.warning("Amazon data organizer failed")
+
+        logger.info(f"Scraping completed - Temu: {results['temu_count']}, Amazon: {results['amazon_count']}")
+
+        return jsonify({
+            'success': True,
+            'temu_count': results['temu_count'],
+            'amazon_count': results['amazon_count'],
+            'message': f"Scraped {results['temu_count'] + results['amazon_count']} total products"
+        })
+
+    except Exception as e:
+        logger.error(f"Error in scrape endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 # Main matching endpoint
@@ -357,6 +572,38 @@ def list_categories():
         'categories': categories_data,
         'total': len(categories_data)
     })
+
+
+@app.route('/api/categories/<category>/count', methods=['GET'])
+def get_category_count(category):
+    """Get product count for a specific category"""
+    try:
+        category_slug = sanitize_filename(category)
+        temu_file = Path(f"temu_{category_slug}_analysis.json")
+        amazon_file = Path(f"amazon_{category_slug}_analysis.json")
+
+        total_count = 0
+
+        if temu_file.exists():
+            with open(temu_file, 'r', encoding='utf-8') as f:
+                temu_data = json.load(f)
+                temu_products = matcher._extract_products(temu_data, 'temu') if matcher else []
+                total_count += len(temu_products)
+
+        if amazon_file.exists():
+            with open(amazon_file, 'r', encoding='utf-8') as f:
+                amazon_data = json.load(f)
+                amazon_products = matcher._extract_products(amazon_data, 'amazon') if matcher else []
+                total_count += len(amazon_products)
+
+        return jsonify({
+            'category': category,
+            'total': total_count
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting count for {category}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 # Error handlers
