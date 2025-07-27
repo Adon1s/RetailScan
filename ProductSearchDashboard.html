@@ -252,10 +252,19 @@
         .btn-secondary {
             background: #f0f0f0;
             color: #333;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            font-size: 1em;
+            text-transform: none;
         }
 
         .btn-secondary:hover:not(:disabled) {
             background: #e0e0e0;
+        }
+
+        .btn-secondary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .progress-section {
@@ -280,19 +289,44 @@
             font-size: 1.1em;
         }
 
+        .progress-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .overall-progress {
+            font-weight: bold;
+            color: #3b82f6;
+            font-size: 14px;
+        }
+
         .progress-bar-container {
+            position: relative;
             background: #e0e0e0;
-            height: 8px;
+            height: 20px;
             border-radius: 10px;
             overflow: hidden;
             margin-bottom: 20px;
         }
 
         .progress-bar {
+            position: absolute;
             height: 100%;
-            background: linear-gradient(90deg, #2a5298 0%, #1e3c72 100%);
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
             border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-bar-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         .log-output {
@@ -453,6 +487,71 @@
             color: #666;
         }
 
+        /* Category dropdown with refresh button */
+        .category-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .category-input-group .select-wrapper {
+            flex: 1;
+        }
+
+        #refreshCategories {
+            padding: 10px;
+            font-size: 1.2em;
+            height: fit-content;
+            min-width: 40px;
+        }
+
+        /* Scrape options styling */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .checkbox-label small {
+            margin-left: 10px;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .scrape-section {
+            background: #e8f0fe;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 2px solid #3b82f6;
+        }
+
+        .form-help {
+            display: block;
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        #categorySelect option:disabled {
+            color: #999;
+            font-style: italic;
+        }
+
+        .info-box {
+            background: #f0f7ff;
+            border: 1px solid #3b82f6;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #1e3c72;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 25px;
@@ -545,14 +644,15 @@
 
         <div class="input-section">
             <div class="input-group">
-                <label for="titleInput">Product Title</label>
+                <label for="titleInput">Your Product Title</label>
                 <input
                     type="text"
                     id="titleInput"
                     class="text-input"
-                    placeholder="e.g., Wooden Rainbow Stacking Toy"
+                    placeholder="e.g., Wooden Bird Whistle Educational Toy"
                     value=""
                 >
+                <small class="form-help">Enter the specific product name/title you want to find matches for</small>
             </div>
 
             <div class="input-group">
@@ -586,35 +686,60 @@
             </div>
 
             <div class="options-group">
-                <div class="select-wrapper">
-                    <label for="categorySelect">Product Category</label>
-                    <select id="categorySelect" class="select-input">
-                        <option value="">Select a category...</option>
-                        <option value="baby_toys">Baby Toys</option>
-                        <option value="kitchen_gadgets">Kitchen Gadgets</option>
-                        <option value="phone_accessories">Phone Accessories</option>
-                        <option value="home_decor">Home Decor</option>
-                        <option value="fitness_equipment">Fitness Equipment</option>
-                        <option value="pet_supplies">Pet Supplies</option>
-                        <option value="custom">Custom (enter below)</option>
-                    </select>
+                <div class="checkbox-wrapper">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="scrapeFreshData">
+                        <span>Scrape Fresh Data from Temu & Amazon</span>
+                    </label>
                 </div>
-                <div class="select-wrapper">
-                    <label for="customCategory">Custom Category</label>
+            </div>
+
+            <div class="scrape-section" id="scrapeSection" style="display: none;">
+                <h3 style="margin-top: 0; margin-bottom: 15px; color: #2a5298;">🔄 Fresh Data Scraping Options</h3>
+
+                <div class="input-group">
+                    <label for="searchTermsInput">Search Terms for Temu & Amazon</label>
                     <input
                         type="text"
-                        id="customCategory"
+                        id="searchTermsInput"
                         class="text-input"
-                        placeholder="Enter custom category"
-                        disabled
+                        placeholder="e.g., bird toys, wooden toys, educational toys"
+                        value=""
                     >
+                    <small class="form-help">What should we search for on Temu and Amazon? This will find products to match against.</small>
                 </div>
+
+                <div class="input-group">
+                    <label for="numPages">Number of pages to scrape:</label>
+                    <input type="number" id="numPages" min="1" max="10" value="1" class="text-input">
+                    <small class="form-help">More pages = more products but longer wait time (~2-3 min per page)</small>
+                </div>
+
+                <div class="info-box">
+                    📌 <strong>Note:</strong> Scraping will create a new category based on your search terms.
+                    For example, searching for "bird toys" will create files like <code>temu_bird_toys.csv</code> and <code>amazon_bird_toys.csv</code>.
+                </div>
+            </div>
+
+            <div class="input-group" id="categoryGroup">
+                <label for="categorySelect">Or Use Existing Category</label>
+                <div class="category-input-group">
+                    <div class="select-wrapper">
+                        <select id="categorySelect" class="select-input">
+                            <option value="">Loading categories...</option>
+                        </select>
+                    </div>
+                    <button type="button" id="refreshCategories" class="btn btn-secondary" title="Refresh categories">
+                        🔄
+                    </button>
+                </div>
+                <small class="form-help">Select from previously scraped categories</small>
             </div>
 
             <div class="options-group">
                 <div class="checkbox-wrapper">
                     <input type="checkbox" id="useImages" checked>
-                    <label for="useImages">Use image matching (requires CLIP)</label>
+                    <label for="useImages">Use image matching (CLIP)</label>
                 </div>
                 <div class="checkbox-wrapper">
                     <input type="checkbox" id="useLLM" checked>
@@ -642,7 +767,10 @@
 
         <div id="progressSection" class="progress-section">
             <div class="progress-header">
-                <span class="progress-title">Matching Progress</span>
+                <div class="progress-header-left">
+                    <span class="progress-title">Matching Progress</span>
+                    <span id="overallProgress" class="overall-progress">0%</span>
+                </div>
                 <span id="statusIndicator" class="status-indicator running">
                     <span class="spinner"></span>
                     Processing
@@ -699,7 +827,8 @@
         const imagePreview = document.getElementById('imagePreview');
         const previewImg = document.getElementById('previewImg');
         const categorySelect = document.getElementById('categorySelect');
-        const customCategory = document.getElementById('customCategory');
+        const categoryGroup = document.getElementById('categoryGroup');
+        const searchTermsInput = document.getElementById('searchTermsInput');
         const useImages = document.getElementById('useImages');
         const useLLM = document.getElementById('useLLM');
         const topNInput = document.getElementById('topNInput');
@@ -712,6 +841,13 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const matchesList = document.getElementById('matchesList');
         const matchesContainer = document.getElementById('matchesContainer');
+        const overallProgressElement = document.getElementById('overallProgress');
+
+        // New elements
+        const scrapeFreshData = document.getElementById('scrapeFreshData');
+        const scrapeSection = document.getElementById('scrapeSection');
+        const numPagesInput = document.getElementById('numPages');
+        const refreshCategoriesBtn = document.getElementById('refreshCategories');
 
         // Input type toggle
         const fileInputBtn = document.getElementById('fileInputBtn');
@@ -719,18 +855,91 @@
         const fileInputWrapper = document.getElementById('fileInputWrapper');
         const urlInputWrapper = document.getElementById('urlInputWrapper');
 
-        // Matching steps for progress tracking
+        // Matching steps for progress tracking (updated with scrape step)
         const matchingSteps = [
+            { id: 'scrape', name: 'Scraping Data', weight: 20 },
             { id: 'init', name: 'Initialization', weight: 10 },
-            { id: 'prepare', name: 'Preparing Item', weight: 15 },
-            { id: 'load', name: 'Loading Products', weight: 15 },
-            { id: 'match', name: 'Finding Matches', weight: 30 },
-            { id: 'llm', name: 'LLM Re-ranking', weight: 25 },
+            { id: 'prepare', name: 'Preparing Item', weight: 10 },
+            { id: 'load', name: 'Loading Products', weight: 10 },
+            { id: 'match', name: 'Finding Matches', weight: 25 },
+            { id: 'llm', name: 'LLM Re-ranking', weight: 20 },
             { id: 'complete', name: 'Complete', weight: 5 }
         ];
 
         let currentStepIndex = 0;
         let stepProgress = {};
+
+        // Utility function to sanitize filename
+        function sanitizeFilename(filename) {
+            // Replace spaces with underscores and remove special characters
+            let sanitized = filename.replace(/[^\w\s-]/g, '');
+            sanitized = sanitized.replace(/[-\s]+/g, '_');
+            return sanitized.toLowerCase();
+        }
+
+        // Load categories on page load
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+
+                if (!response.ok) {
+                    throw new Error('Failed to load categories');
+                }
+
+                const data = await response.json();
+                const categories = data.categories || [];
+
+                // Clear existing options
+                categorySelect.innerHTML = '';
+
+                // Add default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = categories.length > 0 ? 'Select from existing categories' : 'No existing categories';
+                categorySelect.appendChild(defaultOption);
+
+                // Add categories from scraped data
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.value;
+                    option.textContent = cat.display;
+                    categorySelect.appendChild(option);
+                });
+
+                // Log categories found
+                console.log(`Loaded ${categories.length} categories:`, categories.map(c => c.value));
+
+            } catch (error) {
+                console.error('Error loading categories:', error);
+
+                // Fallback
+                categorySelect.innerHTML = `
+                    <option value="">Failed to load categories</option>
+                `;
+            }
+        }
+
+        // Refresh categories
+        refreshCategoriesBtn.addEventListener('click', async () => {
+            refreshCategoriesBtn.disabled = true;
+            refreshCategoriesBtn.textContent = '⏳';
+
+            await loadCategories();
+
+            refreshCategoriesBtn.disabled = false;
+            refreshCategoriesBtn.textContent = '🔄';
+        });
+
+        // Show/hide scrape options
+        scrapeFreshData.addEventListener('change', () => {
+            scrapeSection.style.display = scrapeFreshData.checked ? 'block' : 'none';
+            categoryGroup.style.display = scrapeFreshData.checked ? 'none' : 'block';
+
+            // Clear category selection when scraping fresh
+            if (scrapeFreshData.checked) {
+                categorySelect.value = '';
+            }
+        });
 
         // Initialize step progress
         function initializeProgress() {
@@ -748,9 +957,10 @@
             let totalWeight = 0;
 
             matchingSteps.forEach(step => {
-                if (!useLLM.checked && step.id === 'llm') {
-                    return;
-                }
+                // Skip disabled steps
+                if (!useLLM.checked && step.id === 'llm') return;
+                if (!scrapeFreshData.checked && step.id === 'scrape') return;
+
                 totalProgress += (stepProgress[step.id] || 0) * step.weight;
                 totalWeight += step.weight;
             });
@@ -761,7 +971,18 @@
         // Update progress bar
         function updateProgressBar() {
             const progress = calculateTotalProgress();
+            const progressPercent = Math.round(progress);
+
+            // Update progress bar width
             progressBar.style.width = `${progress}%`;
+
+            // Update overall progress text
+            if (overallProgressElement) {
+                overallProgressElement.textContent = `${progressPercent}%`;
+            }
+
+            // Add progress text inside the bar
+            progressBar.innerHTML = `<span class="progress-bar-text">${progressPercent}%</span>`;
         }
 
         // Add log entry
@@ -783,47 +1004,51 @@
                 currentStep.textContent = `${step.name} (${Math.round(progress)}%)`;
                 stepProgress[stepId] = progress;
                 updateProgressBar();
+
+                // Log progress for debugging
+                const overallProgress = Math.round(calculateTotalProgress());
+                console.log(`Step: ${step.name} - ${Math.round(progress)}% | Overall: ${overallProgress}%`);
             }
         }
 
         // Save results to server
         async function saveResultsToServer(data) {
-    try {
-        // Ensure input_item is included in the data
-        const saveData = {
-            ...data,
-            input_item: {
-                title: titleInput.value.trim(),
-                image_path: data.input_item?.image_path || null,
-                category: categorySelect.value === 'custom' ? customCategory.value : categorySelect.value
+            try {
+                // Ensure input_item is included in the data
+                const saveData = {
+                    ...data,
+                    input_item: {
+                        title: titleInput.value.trim(),
+                        image_path: data.input_item?.image_path || null,
+                        category: data.metadata?.category || 'unknown'
+                    }
+                };
+
+                const response = await fetch('/api/single-item/save-results', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(saveData)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save results');
+                }
+
+                const result = await response.json();
+                return result.filename;
+            } catch (error) {
+                console.error('Error saving results:', error);
+                // Fallback to client-side save
+                return saveResultsLocally(data);
             }
-        };
-
-        const response = await fetch('/api/single-item/save-results', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(saveData)
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to save results');
         }
-
-        const result = await response.json();
-        return result.filename;
-    } catch (error) {
-        console.error('Error saving results:', error);
-        // Fallback to client-side save
-        return saveResultsLocally(data);
-    }
-}
 
         // Fallback: Save results locally
         function saveResultsLocally(data) {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-            const category = categorySelect.value === 'custom' ? customCategory.value : categorySelect.value;
+            const category = data.metadata?.category || 'results';
             const filename = `single_item_matches_${category}_${timestamp}.json`;
 
             // Create a blob with the JSON data
@@ -862,7 +1087,6 @@
             }
             addLogEntry('Opening results dashboard...', 'info');
        }
-
 
         // Handle file input
         imageInput.addEventListener('change', (e) => {
@@ -921,14 +1145,6 @@
             fileInputWrapper.style.display = 'none';
         });
 
-        // Category selection
-        categorySelect.addEventListener('change', () => {
-            customCategory.disabled = categorySelect.value !== 'custom';
-            if (categorySelect.value !== 'custom') {
-                customCategory.value = '';
-            }
-        });
-
         // Clear form
         function clearForm() {
             titleInput.value = '';
@@ -939,13 +1155,15 @@
             fileInputLabel.querySelector('.file-name').textContent = 'Click to upload image or drag & drop';
             imagePreview.style.display = 'none';
             categorySelect.value = '';
-            customCategory.value = '';
-            customCategory.disabled = true;
+            searchTermsInput.value = '';
             progressSection.style.display = 'none';
             matchesList.style.display = 'none';
             logOutput.innerHTML = '';
             matchesContainer.innerHTML = '';
             matchResults = null;
+            scrapeFreshData.checked = false;
+            scrapeSection.style.display = 'none';
+            categoryGroup.style.display = 'block';
         }
 
         // Display matches
@@ -986,7 +1204,7 @@
             // Validate inputs
             const title = titleInput.value.trim();
             if (!title) {
-                alert('Please enter a product title');
+                alert('Please enter your product title');
                 return;
             }
 
@@ -1004,13 +1222,25 @@
                 return;
             }
 
-            const category = categorySelect.value === 'custom'
-                ? customCategory.value.trim()
-                : categorySelect.value;
+            let category = '';
+            let searchTerms = '';
 
-            if (!category) {
-                alert('Please select or enter a category');
-                return;
+            if (scrapeFreshData.checked) {
+                // Using fresh scraping
+                searchTerms = searchTermsInput.value.trim();
+                if (!searchTerms) {
+                    alert('Please enter search terms for scraping');
+                    return;
+                }
+                // Generate category from search terms
+                category = sanitizeFilename(searchTerms);
+            } else {
+                // Using existing category
+                category = categorySelect.value;
+                if (!category) {
+                    alert('Please select a category or enable fresh scraping');
+                    return;
+                }
             }
 
             isProcessing = true;
@@ -1030,7 +1260,46 @@
             statusIndicator.innerHTML = '<span class="spinner"></span> Processing';
 
             try {
-                // Prepare form data
+                // Check if we need to scrape fresh data
+                if (scrapeFreshData.checked) {
+                    updateCurrentStep('scrape', 0);
+                    addLogEntry('Starting fresh data scraping...', 'info');
+                    addLogEntry(`Search terms: "${searchTerms}"`, 'info');
+                    addLogEntry(`Category will be: "${category}"`, 'info');
+
+                    updateCurrentStep('scrape', 30);
+                    addLogEntry(`Searching Temu for "${searchTerms}" (${numPagesInput.value} page(s))...`, 'info');
+
+                    updateCurrentStep('scrape', 60);
+                    addLogEntry(`Searching Amazon for "${searchTerms}" (${numPagesInput.value} page(s))...`, 'info');
+
+                    // Run scrapers
+                    const scrapeResponse = await fetch('/api/single-item/scrape', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            searchTerm: searchTerms, // Use the search terms from the input
+                            category: category,
+                            numPages: parseInt(numPagesInput.value)
+                        })
+                    });
+
+                    if (!scrapeResponse.ok) {
+                        const errorData = await scrapeResponse.json();
+                        throw new Error(errorData.error || 'Failed to scrape data');
+                    }
+
+                    const scrapeData = await scrapeResponse.json();
+                    updateCurrentStep('scrape', 100);
+                    addLogEntry(`✓ Scraped ${scrapeData.temu_count} Temu and ${scrapeData.amazon_count} Amazon products`, 'success');
+
+                    // Reload categories to include the newly scraped data
+                    await loadCategories();
+                }
+
+                // Prepare form data for matching
                 const formData = new FormData();
                 formData.append('title', title);
                 formData.append('category', category);
@@ -1073,7 +1342,7 @@
                 addLogEntry('✓ Item prepared successfully', 'success');
 
                 updateCurrentStep('load', 100);
-                addLogEntry(`✓ Loaded ${data.metadata?.total_products_checked || 0} products`, 'success');
+                addLogEntry(`✓ Loaded ${data.metadata?.total_products_checked || 0} products from category "${category}"`, 'success');
 
                 updateCurrentStep('match', 100);
                 addLogEntry(`✓ Found ${data.matches?.length || 0} potential matches`, 'success');
@@ -1136,10 +1405,7 @@
             const duration = Math.round((endTime - startTime) / 1000);
 
             // Update UI
-             findMatchesBtn.disabled = true; // prevent duplicate submissions during processing
-             progressSection.style.display = 'block';
-             matchesList.style.display = 'none';
-             logOutput.innerHTML = '';
+            findMatchesBtn.disabled = false;
 
             // Update status
             statusIndicator.className = 'status-indicator completed';
@@ -1203,6 +1469,11 @@
             if (e.key === 'Enter' && !isProcessing) {
                 findMatches();
             }
+        });
+
+        // Load categories on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategories();
         });
     </script>
 </body>
