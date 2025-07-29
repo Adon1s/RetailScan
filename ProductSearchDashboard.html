@@ -298,35 +298,46 @@
         .overall-progress {
             font-weight: bold;
             color: #3b82f6;
-            font-size: 14px;
+            font-size: 16px;
         }
 
         .progress-bar-container {
             position: relative;
             background: #e0e0e0;
-            height: 20px;
-            border-radius: 10px;
+            height: 24px;
+            border-radius: 12px;
             overflow: hidden;
             margin-bottom: 20px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
 
         .progress-bar {
             position: absolute;
             height: 100%;
             background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-            border-radius: 10px;
-            transition: width 0.3s ease;
+            border-radius: 12px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
         }
 
         .progress-bar-text {
             position: absolute;
             width: 100%;
             text-align: center;
-            line-height: 20px;
+            line-height: 24px;
             color: white;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+
+        .progress-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 15px;
         }
 
         .log-output {
@@ -777,9 +788,14 @@
                 </span>
             </div>
             <div class="progress-bar-container">
-                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                <div id="progressBar" class="progress-bar" style="width: 0%">
+                    <span class="progress-bar-text">0%</span>
+                </div>
             </div>
-            <div id="currentStep" style="color: #666; margin-bottom: 10px;">Initializing...</div>
+            <div class="progress-details">
+                <span id="currentStep">Initializing...</span>
+                <span id="progressDetail"></span>
+            </div>
             <div id="logOutput" class="log-output"></div>
         </div>
 
@@ -818,6 +834,12 @@
         let matchResults = null; // Store results for saving
         // Pre-opened window reference to avoid popup blockers
         let resultsWindow = null;
+        let progressInterval = null;
+        let currentTaskId = null;
+
+        // Track displayed log entries to prevent duplicates
+        let displayedLogs = new Set();
+        let lastLogTimestamp = null;
 
         // DOM elements
         const titleInput = document.getElementById('titleInput');
@@ -837,6 +859,7 @@
         const progressSection = document.getElementById('progressSection');
         const progressBar = document.getElementById('progressBar');
         const currentStep = document.getElementById('currentStep');
+        const progressDetail = document.getElementById('progressDetail');
         const logOutput = document.getElementById('logOutput');
         const statusIndicator = document.getElementById('statusIndicator');
         const matchesList = document.getElementById('matchesList');
@@ -855,19 +878,49 @@
         const fileInputWrapper = document.getElementById('fileInputWrapper');
         const urlInputWrapper = document.getElementById('urlInputWrapper');
 
-        // Matching steps for progress tracking (updated with scrape step)
-        const matchingSteps = [
-            { id: 'scrape', name: 'Scraping Data', weight: 20 },
-            { id: 'init', name: 'Initialization', weight: 10 },
-            { id: 'prepare', name: 'Preparing Item', weight: 10 },
-            { id: 'load', name: 'Loading Products', weight: 10 },
-            { id: 'match', name: 'Finding Matches', weight: 25 },
-            { id: 'llm', name: 'LLM Re-ranking', weight: 20 },
-            { id: 'complete', name: 'Complete', weight: 5 }
-        ];
+        // Dynamic matching steps based on configuration
+        function getMatchingSteps() {
+            const numPages = scrapeFreshData.checked ? parseInt(numPagesInput.value) : 0;
+
+            // Calculate scraping weight based on pages (10-30%)
+            let scrapeWeight = 0;
+            if (numPages > 0) {
+                if (numPages === 1) scrapeWeight = 10;
+                else if (numPages <= 5) scrapeWeight = 15 + (numPages - 2) * 1.67;
+                else if (numPages < 10) scrapeWeight = 20 + (numPages - 5) * 2;
+                else scrapeWeight = 30;
+            }
+
+            // Calculate remaining weights
+            const hasLLM = useLLM.checked;
+            const remainingWeight = 100 - scrapeWeight;
+
+            const steps = [];
+
+            if (scrapeWeight > 0) {
+                steps.push({ id: 'scrape', name: 'Scraping Data', weight: scrapeWeight });
+            }
+
+            // Fixed weights for other steps
+            steps.push(
+                { id: 'organize', name: 'Organizing Data', weight: 5 },
+                { id: 'init', name: 'Initialization', weight: 5 },
+                { id: 'prepare', name: 'Preparing Item', weight: 5 },
+                { id: 'match', name: 'Finding Matches', weight: 20 }
+            );
+
+            if (hasLLM) {
+                steps.push({ id: 'llm', name: 'LLM Re-ranking', weight: 40 });
+            }
+
+            steps.push({ id: 'complete', name: 'Finalizing', weight: hasLLM ? 5 : 45 });
+
+            return steps;
+        }
 
         let currentStepIndex = 0;
         let stepProgress = {};
+        let matchingSteps = [];
 
         // Utility function to sanitize filename
         function sanitizeFilename(filename) {
@@ -943,11 +996,15 @@
 
         // Initialize step progress
         function initializeProgress() {
+            matchingSteps = getMatchingSteps();
             stepProgress = {};
             matchingSteps.forEach(step => {
                 stepProgress[step.id] = 0;
             });
             currentStepIndex = 0;
+            // Clear displayed logs when starting new process
+            displayedLogs.clear();
+            lastLogTimestamp = null;
             updateProgressBar();
         }
 
@@ -957,51 +1014,63 @@
             let totalWeight = 0;
 
             matchingSteps.forEach(step => {
-                // Skip disabled steps
-                if (!useLLM.checked && step.id === 'llm') return;
-                if (!scrapeFreshData.checked && step.id === 'scrape') return;
-
-                totalProgress += (stepProgress[step.id] || 0) * step.weight;
-                totalWeight += step.weight;
+                totalProgress += (stepProgress[step.id] || 0) * (step.weight / 100);
+                totalWeight += step.weight / 100;
             });
 
             return totalWeight > 0 ? (totalProgress / totalWeight) : 0;
         }
 
-        // Update progress bar
-        function updateProgressBar() {
-            const progress = calculateTotalProgress();
-            const progressPercent = Math.round(progress);
 
-            // Update progress bar width
-            progressBar.style.width = `${progress}%`;
+function updateProgressBar() {
+  const progress        = calculateTotalProgress();
+  const progressPercent = Math.round(progress);
 
-            // Update overall progress text
-            if (overallProgressElement) {
-                overallProgressElement.textContent = `${progressPercent}%`;
+  progressBar.style.width = `${progressPercent}%`;
+
+  let textNode = progressBar.querySelector('.progress-bar-text');
+  if (!textNode) {
+    textNode            = document.createElement('span');
+    textNode.className  = 'progress-bar-text';
+    progressBar.appendChild(textNode);
+  }
+  textNode.textContent = `${progressPercent}%`;
+
+  if (overallProgressElement) {
+    overallProgressElement.textContent = `${progressPercent}%`;
+  }
+}
+
+
+        // Add log entry with duplicate prevention
+        function addLogEntry(message, type = 'info', timestamp = null) {
+            // Create a unique key for this log entry
+            const logKey = `${message}_${type}`;
+
+            // Check if this exact log has already been displayed
+            if (displayedLogs.has(logKey)) {
+                return; // Skip duplicate
             }
 
-            // Add progress text inside the bar
-            progressBar.innerHTML = `<span class="progress-bar-text">${progressPercent}%</span>`;
-        }
+            // Add to displayed logs
+            displayedLogs.add(logKey);
 
-        // Add log entry
-        function addLogEntry(message, type = 'info') {
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
 
-            const timestamp = new Date().toLocaleTimeString();
-            entry.textContent = `[${timestamp}] ${message}`;
+            const displayTime = timestamp || new Date().toLocaleTimeString();
+            entry.textContent = `[${displayTime}] ${message}`;
 
             logOutput.appendChild(entry);
             logOutput.scrollTop = logOutput.scrollHeight;
         }
 
-        // Update current step display
-        function updateCurrentStep(stepId, progress = 0) {
+        // Update current step display with detailed progress
+        function updateCurrentStep(stepId, progress = 0, detail = '') {
             const step = matchingSteps.find(s => s.id === stepId);
             if (step) {
                 currentStep.textContent = `${step.name} (${Math.round(progress)}%)`;
+                progressDetail.textContent = detail;
                 stepProgress[stepId] = progress;
                 updateProgressBar();
 
@@ -1009,6 +1078,51 @@
                 const overallProgress = Math.round(calculateTotalProgress());
                 console.log(`Step: ${step.name} - ${Math.round(progress)}% | Overall: ${overallProgress}%`);
             }
+        }
+
+        // Poll for progress updates with duplicate prevention
+        async function pollProgress(taskId) {
+            if (!taskId) return;
+
+            try {
+                const response = await fetch(`/api/single-item/progress/${taskId}`);
+                if (response.ok) {
+                    const data = await response.json();
+
+                    if (data.step && data.progress !== undefined) {
+                        updateCurrentStep(data.step, data.progress, data.detail || '');
+
+                        // Add any new log entries with timestamp check
+                        if (data.log && data.timestamp) {
+                            // Only add if this is a new timestamp
+                            if (data.timestamp !== lastLogTimestamp) {
+                                lastLogTimestamp = data.timestamp;
+                                addLogEntry(data.log, data.logType || 'info');
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling progress:', error);
+            }
+        }
+
+        // Start progress polling
+        function startProgressPolling(taskId) {
+            currentTaskId = taskId;
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+            progressInterval = setInterval(() => pollProgress(taskId), 500); // Poll every 500ms
+        }
+
+        // Stop progress polling
+        function stopProgressPolling() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            currentTaskId = null;
         }
 
         // Save results to server
@@ -1164,6 +1278,10 @@
             scrapeFreshData.checked = false;
             scrapeSection.style.display = 'none';
             categoryGroup.style.display = 'block';
+            stopProgressPolling();
+            // Clear log tracking
+            displayedLogs.clear();
+            lastLogTimestamp = null;
         }
 
         // Display matches
@@ -1182,7 +1300,7 @@
                         <span class="match-platform ${platformClass}">${match.platform.toUpperCase()}</span>
                         <div class="match-title">${match.title}</div>
                         <div class="match-details">
-                            <span>💰 $${match.price.toFixed(2)}</span>
+                            <span>💰 ${match.price.toFixed(2)}</span>
                             <span>🏷️ ID: ${match.product_id}</span>
                             ${match.image_available ? '<span>🖼️ Image available</span>' : ''}
                         </div>
@@ -1252,7 +1370,7 @@
             matchesList.style.display = 'none';
             logOutput.innerHTML = '';
 
-            // Initialize progress
+            // Initialize progress with dynamic steps
             initializeProgress();
 
             // Update status
@@ -1260,18 +1378,19 @@
             statusIndicator.innerHTML = '<span class="spinner"></span> Processing';
 
             try {
+                // Generate a task ID for progress tracking
+                const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
                 // Check if we need to scrape fresh data
                 if (scrapeFreshData.checked) {
-                    updateCurrentStep('scrape', 0);
+                    const numPages = parseInt(numPagesInput.value);
+                    updateCurrentStep('scrape', 0, 'Starting scrapers...');
                     addLogEntry('Starting fresh data scraping...', 'info');
                     addLogEntry(`Search terms: "${searchTerms}"`, 'info');
                     addLogEntry(`Category will be: "${category}"`, 'info');
 
-                    updateCurrentStep('scrape', 30);
-                    addLogEntry(`Searching Temu for "${searchTerms}" (${numPagesInput.value} page(s))...`, 'info');
-
-                    updateCurrentStep('scrape', 60);
-                    addLogEntry(`Searching Amazon for "${searchTerms}" (${numPagesInput.value} page(s))...`, 'info');
+                    // Start progress polling
+                    startProgressPolling(taskId);
 
                     // Run scrapers
                     const scrapeResponse = await fetch('/api/single-item/scrape', {
@@ -1280,9 +1399,10 @@
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            searchTerm: searchTerms, // Use the search terms from the input
+                            searchTerm: searchTerms,
                             category: category,
-                            numPages: parseInt(numPagesInput.value)
+                            numPages: numPages,
+                            taskId: taskId // Pass task ID for progress tracking
                         })
                     });
 
@@ -1292,12 +1412,15 @@
                     }
 
                     const scrapeData = await scrapeResponse.json();
-                    updateCurrentStep('scrape', 100);
+                    updateCurrentStep('scrape', 100, 'Scraping complete');
                     addLogEntry(`✓ Scraped ${scrapeData.temu_count} Temu and ${scrapeData.amazon_count} Amazon products`, 'success');
 
                     // Reload categories to include the newly scraped data
                     await loadCategories();
                 }
+
+                // Data organization step
+                updateCurrentStep('organize', 100, 'Data organized');
 
                 // Prepare form data for matching
                 const formData = new FormData();
@@ -1305,6 +1428,7 @@
                 formData.append('category', category);
                 formData.append('useImages', useImages.checked);
                 formData.append('topN', topNInput.value);
+                formData.append('taskId', taskId);
 
                 if (inputType === 'file') {
                     formData.append('image', selectedFile);
@@ -1313,10 +1437,10 @@
                 }
 
                 // Initial progress updates
-                updateCurrentStep('init', 100);
+                updateCurrentStep('init', 100, 'Matcher initialized');
                 addLogEntry('Initializing Single Item Matcher...', 'info');
 
-                updateCurrentStep('prepare', 50);
+                updateCurrentStep('prepare', 50, 'Computing embeddings...');
                 addLogEntry('Preparing user item embeddings...', 'info');
 
                 // Make API call
@@ -1338,18 +1462,16 @@
                 }
 
                 // Update progress based on response
-                updateCurrentStep('prepare', 100);
+                updateCurrentStep('prepare', 100, 'Embeddings ready');
                 addLogEntry('✓ Item prepared successfully', 'success');
 
-                updateCurrentStep('load', 100);
-                addLogEntry(`✓ Loaded ${data.metadata?.total_products_checked || 0} products from category "${category}"`, 'success');
-
-                updateCurrentStep('match', 100);
+                updateCurrentStep('match', 100, `Matched against ${data.metadata?.total_products_checked || 0} products`);
                 addLogEntry(`✓ Found ${data.matches?.length || 0} potential matches`, 'success');
 
                 // LLM re-ranking if enabled
                 if (useLLM.checked && data.matches && data.matches.length > 0) {
-                    updateCurrentStep('llm', 50);
+                    const totalMatches = Math.min(20, data.matches.length);
+                    updateCurrentStep('llm', 0, `Re-ranking ${totalMatches} matches...`);
                     addLogEntry('Running LLM re-ranking...', 'info');
 
                     try {
@@ -1363,7 +1485,8 @@
                                 matches: data.matches,
                                 userItem: data.input_item,
                                 category: category,
-                                tempImagePath: data.temp_image_path || ''
+                                tempImagePath: data.temp_image_path || '',
+                                taskId: taskId
                             })
                         });
 
@@ -1371,29 +1494,31 @@
                             const llmData = await llmResponse.json();
                             if (llmData.matches) {
                                 data.matches = llmData.matches;
-                                updateCurrentStep('llm', 100);
+                                updateCurrentStep('llm', 100, 'Re-ranking complete');
                                 addLogEntry('✓ LLM re-ranking complete', 'success');
                             } else {
-                                updateCurrentStep('llm', 100);
+                                updateCurrentStep('llm', 100, 'Re-ranking skipped');
                                 addLogEntry('⚠ LLM re-ranking unavailable, using basic scores', 'warning');
                             }
                         } else {
-                            updateCurrentStep('llm', 100);
+                            updateCurrentStep('llm', 100, 'Re-ranking failed');
                             addLogEntry('⚠ LLM re-ranking failed, using basic scores', 'warning');
                         }
                     } catch (llmError) {
                         console.error('LLM error:', llmError);
-                        updateCurrentStep('llm', 100);
+                        updateCurrentStep('llm', 100, 'Re-ranking error');
                         addLogEntry('⚠ LLM re-ranking error, using basic scores', 'warning');
                     }
                 }
 
-                updateCurrentStep('complete', 100);
+                updateCurrentStep('complete', 100, 'Processing complete');
                 matchResults = data; // Store results
+                stopProgressPolling();
                 completeMatching(data);
 
             } catch (error) {
                 console.error('Matching error:', error);
+                stopProgressPolling();
                 handleError(error.message);
             }
         }
