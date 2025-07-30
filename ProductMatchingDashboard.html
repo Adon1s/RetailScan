@@ -603,70 +603,84 @@
     let CATEGORY_SLUG = ''; // Store the sanitized category name for file paths
 
     // Initialize dashboard
-    async function init() {
+    // Update the init() function in ProductMatchingDashboard.html:
+
+async function init() {
+    // Check for category in URL parameters first
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCategory = urlParams.get('category');
+
+    let userInput;
+
+    if (urlCategory) {
+        // Category provided in URL, use it directly
+        userInput = urlCategory.replace(/_/g, ' '); // Convert underscores back to spaces for display
+        console.log(`Using category from URL: ${userInput}`);
+    } else {
         // Prompt for category name
-        const userInput = prompt(
+        userInput = prompt(
             "Enter the product category (e.g., 'baby toys' or 'baby_toys'):\n" +
             "This will load files named:\n" +
             "- matching_results_[category].json or\n" +
             "- matching_results_enriched_[category].json"
         );
-
-        if (!userInput) {
-            document.getElementById('match-grid').innerHTML =
-                '<div class="empty-state">No category entered. Please refresh the page and enter a category name.</div>';
-            return;
-        }
-
-        // Store both original and sanitized versions
-        CATEGORY_NAME = userInput.trim();
-        CATEGORY_SLUG = sanitizeFilename(CATEGORY_NAME);
-
-        console.log(`Original input: "${CATEGORY_NAME}", Sanitized: "${CATEGORY_SLUG}"`);
-
-        try {
-            // Try to load enriched results first, fall back to original
-            let response = await fetch(`matching_results_enriched_${CATEGORY_SLUG}.json`);
-            if (!response.ok) {
-                console.log('Enriched results not found, loading original...');
-                response = await fetch(`matching_results_${CATEGORY_SLUG}.json`);
-            }
-            const data = await response.json();
-
-            // Handle both formats: array directly or object with matches property
-            if (Array.isArray(data)) {
-                matches = data;
-            } else if (data.matches && Array.isArray(data.matches)) {
-                matches = data.matches;
-            } else {
-                matches = [];
-            }
-
-            console.log(`Loaded ${matches.length} matches for category: ${CATEGORY_NAME} (using files with slug: ${CATEGORY_SLUG})`);
-
-            // Check if we have LLM data
-            if (matches.some(m => m.llm_processed)) {
-                document.body.classList.add('has-llm-data');
-            }
-
-            // Load saved decisions from localStorage (use sanitized slug for consistency)
-            const saved = localStorage.getItem(`matchDecisions_${CATEGORY_SLUG}`);
-            if (saved) {
-                decisions = JSON.parse(saved);
-            }
-
-            updateStats();
-            applyFilters();
-            renderMatches();
-        } catch (error) {
-            console.error('Error loading matches:', error);
-            document.getElementById('match-grid').innerHTML =
-                `<div class="empty-state">Error loading matching results for category '${CATEGORY_NAME}'. Please ensure matching_results_${CATEGORY_SLUG}.json is in the same directory.</div>`;
-        }
-
-        // Setup event listeners
-        setupEventListeners();
     }
+
+    if (!userInput) {
+        document.getElementById('match-grid').innerHTML =
+            '<div class="empty-state">No category entered. Please refresh the page and enter a category name.</div>';
+        return;
+    }
+
+    // Store both original and sanitized versions
+    CATEGORY_NAME = userInput.trim();
+    CATEGORY_SLUG = sanitizeFilename(CATEGORY_NAME);
+
+    console.log(`Original input: "${CATEGORY_NAME}", Sanitized: "${CATEGORY_SLUG}"`);
+
+    try {
+        // Try to load enriched results first, fall back to original
+        let response = await fetch(`matching_results_enriched_${CATEGORY_SLUG}.json`);
+        if (!response.ok) {
+            console.log('Enriched results not found, loading original...');
+            response = await fetch(`matching_results_${CATEGORY_SLUG}.json`);
+        }
+        const data = await response.json();
+
+        // Handle both formats: array directly or object with matches property
+        if (Array.isArray(data)) {
+            matches = data;
+        } else if (data.matches && Array.isArray(data.matches)) {
+            matches = data.matches;
+        } else {
+            matches = [];
+        }
+
+        console.log(`Loaded ${matches.length} matches for category: ${CATEGORY_NAME} (using files with slug: ${CATEGORY_SLUG})`);
+
+        // Check if we have LLM data
+        if (matches.some(m => m.llm_processed)) {
+            document.body.classList.add('has-llm-data');
+        }
+
+        // Load saved decisions from localStorage (use sanitized slug for consistency)
+        const saved = localStorage.getItem(`matchDecisions_${CATEGORY_SLUG}`);
+        if (saved) {
+            decisions = JSON.parse(saved);
+        }
+
+        updateStats();
+        applyFilters();
+        renderMatches();
+    } catch (error) {
+        console.error('Error loading matches:', error);
+        document.getElementById('match-grid').innerHTML =
+            `<div class="empty-state">Error loading matching results for category '${CATEGORY_NAME}'. Please ensure matching_results_${CATEGORY_SLUG}.json is in the same directory.</div>`;
+    }
+
+    // Setup event listeners
+    setupEventListeners();
+}
 
     // Setup event listeners
     function setupEventListeners() {
