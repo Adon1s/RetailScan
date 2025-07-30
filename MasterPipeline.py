@@ -290,11 +290,13 @@ class IncrementalMatchingPipeline:
 
 
 class PipelineRunner:
-    def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=True, search_terms=None):
+    def __init__(self, skip_scraping=False, skip_llm=False, verbose=True, use_http_server=True, search_terms=None,
+                 no_dashboard=False):
         self.skip_scraping = skip_scraping
         self.skip_llm = skip_llm
         self.verbose = verbose
         self.use_http_server = use_http_server
+        self.no_dashboard = no_dashboard  # Add this line
 
         # Normalize search terms - convert underscores to spaces for display/search
         self.search_terms = normalize_search_terms(search_terms or "baby toys")
@@ -343,6 +345,22 @@ class PipelineRunner:
 
         with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
+
+    def find_available_data_files(self):
+        """Find available CSV and JSON files for different search terms"""
+        available_terms = set()
+
+        # Check for CSV files
+        for csv_file in Path(".").glob("temu_*.csv"):
+            match = re.match(r"temu_(.+)\.csv", csv_file.name)
+            if match:
+                term_slug = match.group(1)
+                # Check if corresponding Amazon CSV exists
+                if Path(f"amazon_{term_slug}.csv").exists():
+                    available_terms.add(term_slug)
+
+        # Convert slugs back to readable terms
+        return [term.replace('_', ' ') for term in sorted(available_terms)]
 
     def run_script(self, script_name: str, description: str, input_text: str = None) -> bool:
         """Run a Python script with real-time streaming output"""
@@ -797,6 +815,39 @@ class PipelineRunner:
         else:
             self.log("\n--- Skipping scraping (using existing CSVs) ---")
 
+            # CHECK IF REQUIRED CSV FILES EXIST WHEN SKIPPING SCRAPING
+            missing_files = []
+            if not self.temu_csv.exists():
+                missing_files.append(str(self.temu_csv))
+            if not self.amazon_csv.exists():
+                missing_files.append(str(self.amazon_csv))
+
+            if missing_files:
+                self.log("\n" + "=" * 60, "ERROR")
+                self.log("ERROR: Cannot skip scraping - required CSV files are missing:", "ERROR")
+                for file in missing_files:
+                    self.log(f"  - {file}", "ERROR")
+
+                # Show available search terms
+                available_terms = self.find_available_data_files()
+                if available_terms:
+                    self.log("\nAvailable search terms with existing data:", "ERROR")
+                    for term in available_terms:
+                        self.log(f"  - {term}", "ERROR")
+                    self.log("\nTo use existing data, run with one of these search terms:", "ERROR")
+                    self.log(f'  python {sys.argv[0]} --search "{available_terms[0]}" --skip-scraping', "ERROR")
+                else:
+                    self.log("\nNo existing data files found in the current directory.", "ERROR")
+
+                self.log("\nTo proceed, either:", "ERROR")
+                self.log("  1. Run without --skip-scraping to scrape fresh data", "ERROR")
+                self.log("  2. Use a search term that has existing data files", "ERROR")
+                self.log(f"\nExpected files for search term '{self.search_terms}':", "ERROR")
+                self.log(f"  - {self.temu_csv}", "ERROR")
+                self.log(f"  - {self.amazon_csv}", "ERROR")
+                self.log("=" * 60, "ERROR")
+                return False
+
         # Step 3 & 4: Data Organization
         self.log("\n--- STEP 3 & 4: Data Organization ---")
 
@@ -821,10 +872,39 @@ class PipelineRunner:
                 pass
 
         if not self.check_output_files([self.temu_json, self.amazon_json], "Data organization"):
+            # Additional helpful error message
+            self.log("\n" + "=" * 60, "ERROR")
+            self.log("ERROR: Data organization failed to create JSON files.", "ERROR")
+            self.log("This usually happens when:", "ERROR")
+            self.log("  1. The CSV files are empty or corrupted", "ERROR")
+            self.log("  2. The data organizer scripts are missing or have errors", "ERROR")
+            self.log("  3. There's insufficient disk space", "ERROR")
+            self.log("\nPlease check the logs above for specific error messages.", "ERROR")
+            self.log("=" * 60, "ERROR")
             return False
 
         # Step 5: Incremental Product Matching
         self.log("\n--- STEP 5: Incremental Product Matching ---")
+
+        # Check if JSON files exist before trying to load
+        if not self.temu_json.exists() or not self.amazon_json.exists():
+            self.log("\n" + "=" * 60, "ERROR")
+            self.log("ERROR: Required JSON analysis files are missing:", "ERROR")
+            if not self.temu_json.exists():
+                self.log(f"  - {self.temu_json}", "ERROR")
+            if not self.amazon_json.exists():
+                self.log(f"  - {self.amazon_json}", "ERROR")
+
+            self.log("\nThese files should have been created by the data organization step.", "ERROR")
+
+            # Check if CSVs exist but JSONs don't
+            if self.temu_csv.exists() and self.amazon_csv.exists():
+                self.log("\nThe CSV files exist but JSON files are missing.", "ERROR")
+                self.log("Try running the pipeline again without --skip-scraping,", "ERROR")
+                self.log("or check if the data organizer scripts are working correctly.", "ERROR")
+
+            self.log("=" * 60, "ERROR")
+            return False
 
         # Load organized data
         try:
@@ -835,7 +915,28 @@ class PipelineRunner:
             with open(self.amazon_json, 'r', encoding='utf-8') as f:
                 amazon_data = json.load(f)
             amazon_products = amazon_data.get('all_products', [])
-        except (FileNotFoundError, json.JSONDecodeError) as e:
+
+            # Check if products were loaded
+            if not temu_products and not amazon_products:
+                self.log("\n" + "=" * 60, "ERROR")
+                self.log("ERROR: No products found in the JSON files.", "ERROR")
+                self.log("The data files exist but appear to be empty.", "ERROR")
+                self.log("This might happen if:", "ERROR")
+                self.log("  1. The original scraping returned no results", "ERROR")
+                self.log("  2. The search terms didn't match any products", "ERROR")
+                self.log("  3. There was an error during data organization", "ERROR")
+                self.log("\nTry running with different search terms or without --skip-scraping.", "ERROR")
+                self.log("=" * 60, "ERROR")
+                return False
+
+        except json.JSONDecodeError as e:
+            self.log("\n" + "=" * 60, "ERROR")
+            self.log(f"ERROR: Failed to parse JSON files - they may be corrupted.", "ERROR")
+            self.log(f"JSON Error: {e}", "ERROR")
+            self.log("\nTry deleting the JSON files and running the pipeline again.", "ERROR")
+            self.log("=" * 60, "ERROR")
+            return False
+        except Exception as e:
             self.log(f"Error loading product data: {e}", "ERROR")
             return False
 
@@ -933,9 +1034,12 @@ class PipelineRunner:
             self.log("\n--- Skipping LLM enhancement ---")
 
         # Step 7: Open Dashboard
-        self.log("\n--- STEP 7: Opening Dashboard ---")
-
-        self.serve_dashboard_with_http()
+        if not self.no_dashboard:
+            self.log("\n--- STEP 7: Opening Dashboard ---")
+            self.serve_dashboard_with_http()
+        else:
+            self.log("\n--- STEP 7: Skipping Dashboard (API mode) ---")
+            self.log("Dashboard available at server URL")
 
         # Clean up config file
         try:
@@ -1082,6 +1186,8 @@ def main():
                         help="Reduce output verbosity")
     parser.add_argument("--http-server", action="store_true",
                         help="Use HTTP server for dashboard instead of file://")
+    parser.add_argument("--no-dashboard", action="store_true",
+                        help="Skip opening dashboard (for API server mode)")  # Add this line
     parser.add_argument("--port", type=int, default=8000,
                         help="Port for HTTP server (default: 8000)")
     parser.add_argument("--step", type=str,
@@ -1133,7 +1239,7 @@ def main():
             search_terms = normalize_search_terms(user_input) if user_input else "baby toys"
 
     if args.step:
-        runner = PipelineRunner(verbose=not args.quiet, search_terms=search_terms)
+        runner = PipelineRunner(verbose=not args.quiet, search_terms=search_terms, no_dashboard=args.no_dashboard)
 
         if args.step == "scrape":
             num_pages = int(input("How many pages to scrape? (default: 1): ") or "1")
@@ -1170,7 +1276,8 @@ def main():
             skip_llm=args.skip_llm,
             verbose=not args.quiet,
             use_http_server=args.http_server,
-            search_terms=search_terms
+            search_terms=search_terms,
+            no_dashboard=args.no_dashboard  # Add this line
         )
         runner.run_pipeline()
 

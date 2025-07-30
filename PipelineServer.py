@@ -102,9 +102,11 @@ def stream_pipeline_output(process, search_terms):
             except Exception as e:
                 print(f"Error loading results: {e}")
 
+            # Send completion with dashboard URL
             message_queue.put(json.dumps({
                 'type': 'complete',
-                'results': results
+                'results': results,
+                'dashboardUrl': f'/ProductMatchingDashboard.html?category={search_slug}'
             }))
         else:
             message_queue.put(json.dumps({
@@ -125,6 +127,18 @@ def stream_pipeline_output(process, search_terms):
 def index():
     """Serve the main dashboard"""
     return send_file('PipelineDashboard.html')
+
+@app.route('/ProductMatchingDashboard.html')
+def serve_product_dashboard():
+    """Serve the product matching dashboard"""
+    return send_file('ProductMatchingDashboard.html')
+
+@app.route('/SingleItemResultsDashboard.html')
+def serve_single_item_dashboard():
+    """Serve the single item results dashboard"""
+    if Path('SingleItemResultsDashboard.html').exists():
+        return send_file('SingleItemResultsDashboard.html')
+    return "Single Item Results Dashboard not found", 404
 
 @app.route('/api/status')
 def status():
@@ -157,8 +171,8 @@ def start_pipeline():
         while not message_queue.empty():
             message_queue.get()
 
-        # Build command - use the correct script name from your files
-        cmd = [sys.executable, 'MasterPipeline.py', '--search', search_terms]
+        # Build command - add --no-dashboard flag
+        cmd = [sys.executable, 'MasterPipeline.py', '--search', search_terms, '--no-dashboard']
 
         if skip_scraping:
             cmd.append('--skip-scraping')
@@ -284,7 +298,7 @@ def get_categories():
 
     return jsonify(categories)
 
-# Serve static files (for PWA assets)
+# Serve static files (for all assets)
 @app.route('/<path:path>')
 def serve_static(path):
     """Serve static files"""
