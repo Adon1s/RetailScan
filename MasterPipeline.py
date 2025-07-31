@@ -386,17 +386,39 @@ class PipelineRunner:
                 process.stdin.close()
 
             # Stream output in real-time (non-blocking)
-            def stream_output(pipe, level="INFO"):
+            def stream_output(pipe, default_level="INFO"):
                 """Helper to stream from a pipe"""
                 for line in iter(pipe.readline, ''):
                     line = line.strip()
                     if line:
+                        # Detect actual log level from the message content
+                        actual_level = default_level
+
+                        # Check for Python logging format indicators
+                        if ' - ERROR - ' in line or line.startswith('ERROR:'):
+                            actual_level = "ERROR"
+                        elif ' - WARNING - ' in line or line.startswith('WARNING:'):
+                            actual_level = "WARNING"
+                        elif ' - INFO - ' in line or line.startswith('INFO:'):
+                            actual_level = "INFO"
+                        elif ' - DEBUG - ' in line or line.startswith('DEBUG:'):
+                            actual_level = "INFO"  # Treat debug as info
+                        # Check for success indicators
+                        elif '✓' in line or 'success' in line.lower() or 'completed' in line.lower():
+                            actual_level = "INFO"
+                        # Check for failure indicators
+                        elif '✗' in line or 'failed' in line.lower() or 'error' in line.lower():
+                            actual_level = "ERROR"
+                        elif 'Traceback' in line or 'Exception' in line:
+                            actual_level = "ERROR"
+
                         print(line)  # Print to console immediately
-                        self.log(line, level)  # Also log it
+                        self.log(line, actual_level)  # Log with detected level
 
             # Start threads for streaming stdout and stderr
+            # Note: Both use "INFO" as default since we detect actual level from content
             stdout_thread = threading.Thread(target=stream_output, args=(process.stdout, "INFO"))
-            stderr_thread = threading.Thread(target=stream_output, args=(process.stderr, "ERROR"))
+            stderr_thread = threading.Thread(target=stream_output, args=(process.stderr, "INFO"))
 
             stdout_thread.start()
             stderr_thread.start()
