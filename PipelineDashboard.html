@@ -612,6 +612,15 @@
         return totalWeight > 0 ? (totalProgress / totalWeight) : 0;
     }
 
+        // Sanitize function to match the pipeline's logic
+    function sanitizeFilename(filename) {
+        // Remove special characters except alphanumeric, spaces, underscores, and hyphens
+        let sanitized = filename.replace(/[^\w\s_-]/g, '');
+        // Replace spaces and hyphens with underscores
+        sanitized = sanitized.replace(/[-\s]+/g, '_');
+        return sanitized.toLowerCase();
+    }
+
     // Update progress bar
     function updateProgressBar() {
         const progress = calculateTotalProgress();
@@ -754,109 +763,103 @@
     }
 
     // Start pipeline
-    async function startPipeline() {
-        if (pipelineRunning) return;
+    // Start pipeline
+async function startPipeline() {
+    if (pipelineRunning) return;
 
-        const searchTerms = searchInput.value.trim();
-        if (!searchTerms) {
-            alert('Please enter search terms');
-            return;
+    const searchTerms = searchInput.value.trim();
+    if (!searchTerms) {
+        alert('Please enter search terms');
+        return;
+    }
+
+    pipelineRunning = true;
+    startTime = Date.now();
+
+    // Update UI
+    startButton.disabled = true;
+    stopButton.style.display = 'inline-flex';
+    progressSection.style.display = 'block';
+    resultsSummary.style.display = 'none';
+    logOutput.innerHTML = '';
+
+    // Initialize progress
+    initializeProgress();
+
+    // Update status
+    statusIndicator.className = 'status-indicator running';
+    statusIndicator.innerHTML = '<span class="spinner"></span> Running';
+
+    try {
+        // Call backend API to start pipeline
+        const response = await fetch('/api/pipeline/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                searchTerms: searchTerms,
+                skipScraping: skipScraping.checked,
+                skipLLM: skipLLM.checked,
+                numPages: parseInt(pagesInput.value) || 1
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to start pipeline');
         }
 
-        pipelineRunning = true;
-        startTime = Date.now();
+        // Set up EventSource for real-time updates
+        eventSource = new EventSource('/api/pipeline/stream');
 
-        // Update UI
-        startButton.disabled = true;
-        stopButton.style.display = 'inline-flex';
-        progressSection.style.display = 'block';
-        resultsSummary.style.display = 'none';
-        logOutput.innerHTML = '';
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
 
-        // Initialize progress
-        initializeProgress();
+            if (data.type === 'log') {
+                parseLogOutput(data.message);
+            } else if (data.type === 'complete') {
+                updateStatus('Pipeline completed successfully!', 'success');
+                displayResults(data.results);
 
-        // Update status
-        statusIndicator.className = 'status-indicator running';
-        statusIndicator.innerHTML = '<span class="spinner"></span> Running';
+                // Auto-open the product matching dashboard with category
+                const searchSlug = sanitizeFilename(searchTerms);
 
-        try {
-            // Call backend API to start pipeline
-            const response = await fetch('/api/pipeline/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    searchTerms: searchTerms,
-                    skipScraping: skipScraping.checked,
-                    skipLLM: skipLLM.checked,
-                    numPages: parseInt(pagesInput.value) || 1
-                })
-            });
+                setTimeout(() => {
+                    updateStatus('Opening Product Matching Dashboard...', 'info');
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to start pipeline');
+                    // Pass the category as URL parameter
+                    window.open(`ProductMatchingDashboard.html?category=${encodeURIComponent(searchSlug)}`, '_blank');
+                }, 1500); // 1.5 second delay
+
+                stopPipeline();
+            } else if (data.type === 'error') {
+                updateStatus(`Error: ${data.message}`, 'error');
+                addLogMessage(`ERROR: ${data.message}`, 'error');
+                stopPipeline();
+            } else if (data.type === 'heartbeat') {
+                // Ignore heartbeat messages
+            }
+        };
+
+        eventSource.onerror = function(error) {
+            console.error('EventSource error:', error);
+
+            // Only show connection lost if pipeline is still running
+            if (pipelineRunning && eventSource.readyState === EventSource.CLOSED) {
+                updateStatus('Connection lost. Pipeline may still be running.', 'warning');
+                addLogMessage('WARNING: Lost connection to pipeline stream', 'warning');
             }
 
-            // Set up EventSource for real-time updates
-            eventSource = new EventSource('/api/pipeline/stream');
+            // EventSource will automatically try to reconnect unless we close it
+        };
 
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-
-                if (data.type === 'log') {
-                    parseLogOutput(data.message);
-                } else if (data.type === 'complete') {
-                    updateStatus('Pipeline completed successfully!', 'success');
-                    displayResults(data.results);
-
-                    // Add auto-redirect to product dashboard
-                    if (data.dashboardUrl) {
-                        setTimeout(() => {
-                            const currentUrl = new URL(window.location);
-                            const dashboardUrl = `${currentUrl.protocol}//${currentUrl.host}${data.dashboardUrl}`;
-
-                            // Show redirect message
-                            updateStatus('Redirecting to Product Matching Dashboard...', 'info');
-                            addLogMessage(`Opening dashboard at: ${dashboardUrl}`);
-
-                            // Redirect after a short delay
-                            setTimeout(() => {
-                                window.location.href = dashboardUrl;
-                            }, 1500); // 1.5 second delay
-                        }, 500); // 0.5 second initial delay
-                    }
-
-                    stopPipeline();
-                } else if (data.type === 'error') {
-                    updateStatus(`Error: ${data.message}`, 'error');
-                    addLogMessage(`ERROR: ${data.message}`, 'error');
-                    stopPipeline();
-                } else if (data.type === 'heartbeat') {
-                    // Ignore heartbeat messages
-                }
-            };
-
-            eventSource.onerror = function(error) {
-                console.error('EventSource error:', error);
-
-                // Only show connection lost if pipeline is still running
-                if (pipelineRunning && eventSource.readyState === EventSource.CLOSED) {
-                    updateStatus('Connection lost. Pipeline may still be running.', 'warning');
-                    addLogMessage('WARNING: Lost connection to pipeline stream', 'warning');
-                }
-
-                // EventSource will automatically try to reconnect unless we close it
-            };
-
-        } catch (error) {
-            console.error('Failed to start pipeline:', error);
-            updateStatus(`Failed to start pipeline: ${error.message}`, 'error');
-            stopPipeline();
-        }
+    } catch (error) {
+        console.error('Failed to start pipeline:', error);
+        updateStatus(`Failed to start pipeline: ${error.message}`, 'error');
+        stopPipeline();
     }
+}
 
     // Handle manual stop
     async function handleStopPipeline() {
