@@ -374,6 +374,36 @@
             color: #74c0fc;
         }
 
+        .auto-search-notice {
+    background-color: #e3f2fd;
+    border: 1px solid #1976d2;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.auto-search-notice strong {
+    color: #1976d2;
+}
+
+.auto-search-notice button {
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.auto-search-notice button:hover {
+    background-color: #1565c0;
+}
+
         .status-indicator {
             display: inline-flex;
             align-items: center;
@@ -1600,6 +1630,80 @@ function updateProgressBar() {
         document.addEventListener('DOMContentLoaded', () => {
             loadCategories();
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're coming from the matching dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAuto = urlParams.get('auto') === 'true';
+
+    if (isAuto) {
+        // Try to get product data from sessionStorage
+        const savedData = sessionStorage.getItem('singleItemSearchData');
+
+        if (savedData) {
+            const productData = JSON.parse(savedData);
+
+            // Auto-populate the form
+            document.getElementById('product-title').value = productData.title;
+            document.getElementById('category-select').value = productData.categorySlug;
+
+            // Handle the image
+            if (productData.imagePath) {
+                // Show image preview
+                const imagePreview = document.getElementById('image-preview');
+                if (imagePreview) {
+                    imagePreview.innerHTML = `
+                        <img src="${productData.imagePath}" alt="Product Image" style="max-width: 200px; max-height: 200px;">
+                        <p>Image from ${productData.platform.toUpperCase()} product</p>
+                    `;
+                    imagePreview.style.display = 'block';
+                }
+
+                // Store the image path for the search
+                // You might need to modify this based on your actual form structure
+                const imageUrlInput = document.getElementById('image-url');
+                if (imageUrlInput) {
+                    imageUrlInput.value = productData.imagePath;
+                }
+            }
+
+            // Update UI to show where this search came from
+            const searchHeader = document.querySelector('.search-header');
+            if (searchHeader) {
+                searchHeader.insertAdjacentHTML('afterbegin', `
+                    <div class="auto-search-notice">
+                        🔍 Finding products similar to: <strong>${productData.platform.toUpperCase()} - ${productData.title.substring(0, 50)}...</strong>
+                        <button onclick="clearAutoSearch()" style="margin-left: 10px;">Clear</button>
+                    </div>
+                `);
+            }
+
+            // Clear the data from sessionStorage
+            sessionStorage.removeItem('singleItemSearchData');
+
+            // Optionally auto-start the search
+            setTimeout(() => {
+                if (confirm('Start searching for similar products?')) {
+                    // Trigger the search button click
+                    const searchButton = document.getElementById('search-button');
+                    if (searchButton) {
+                        searchButton.click();
+                    }
+                }
+            }, 500);
+        }
+    }
+});
+
+// Function to clear auto-populated data
+function clearAutoSearch() {
+    document.getElementById('product-title').value = '';
+    document.getElementById('image-url').value = '';
+    document.getElementById('image-preview').style.display = 'none';
+    document.querySelector('.auto-search-notice')?.remove();
+}
+const autoSearchStyles = ''
+        document.head.insertAdjacentHTML('beforeend', autoSearchStyles);
     </script>
 </body>
 </html>

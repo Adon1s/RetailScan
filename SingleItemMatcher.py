@@ -4,9 +4,10 @@ Matches a single user-provided product against all scraped Temu and Amazon produ
 Standalone version - does not depend on ProductMatcher class
 """
 import json
+import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 from dataclasses import dataclass
 from datetime import datetime
@@ -111,7 +112,7 @@ class SingleItemMatcher:
                 stored_metadata.get("cache_version") == current["cache_version"])
 
     def _load_text_cache(self):
-        """Load text embeddings from cache if valid"""
+
         if not self.text_cache_file.exists():
             print("  › No text embedding cache found, starting fresh")
             return {}
@@ -232,10 +233,32 @@ class SingleItemMatcher:
         try:
             # Load image
             if image_path_or_url.startswith('http'):
+                # It's a URL
                 response = requests.get(image_path_or_url, timeout=10)
                 image = Image.open(BytesIO(response.content))
+            elif image_path_or_url.startswith('./'):
+                # It's a relative path
+                # Try to resolve it relative to the current working directory
+                abs_path = os.path.abspath(image_path_or_url)
+                if os.path.exists(abs_path):
+                    image = Image.open(abs_path)
+                else:
+                    # Try without the './'
+                    alt_path = image_path_or_url[2:]
+                    abs_alt_path = os.path.abspath(alt_path)
+                    if os.path.exists(abs_alt_path):
+                        image = Image.open(abs_alt_path)
+                    else:
+                        raise FileNotFoundError(f"Image not found at {image_path_or_url}")
             else:
-                image = Image.open(image_path_or_url)
+                # It's an absolute path or relative without './'
+                if os.path.isabs(image_path_or_url):
+                    # Absolute path
+                    image = Image.open(image_path_or_url)
+                else:
+                    # Relative path without './'
+                    abs_path = os.path.abspath(image_path_or_url)
+                    image = Image.open(abs_path)
 
             # Process with CLIP
             image_input = self.clip_preprocess(image).unsqueeze(0)
@@ -331,20 +354,36 @@ class SingleItemMatcher:
         except:
             return False
 
-    def _validate_image_url(self, url: str) -> bool:
-        """Check if image URL is accessible"""
-        try:
-            response = requests.head(url, timeout=5)
-            return response.status_code == 200
-        except:
-            return False
+    def _validate_image_path(self, path_or_url: str) -> Tuple[bool, str]:
+        """Validate image path or URL and return (is_valid, type)"""
+        # Check if it's a URL
+        if path_or_url.startswith('http'):
+            try:
+                response = requests.head(path_or_url, timeout=5)
+                return response.status_code == 200, 'url'
+            except:
+                return False, 'url'
+
+        # Check if it's a local path
+        if path_or_url.startswith('./'):
+            # Relative path
+            abs_path = os.path.abspath(path_or_url)
+            if os.path.exists(abs_path):
+                return True, 'relative'
+            # Try without './'
+            alt_path = os.path.abspath(path_or_url[2:])
+            return os.path.exists(alt_path), 'relative'
+
+        # Absolute or other relative path
+        abs_path = os.path.abspath(path_or_url)
+        return os.path.exists(abs_path), 'local'
 
     def prepare_user_item(self, title: str, image_path_or_url: str) -> Dict:
         """Prepare user item with embeddings"""
         # Validate image
         if self._is_url(image_path_or_url):
             image_type = "url"
-            image_valid = self._validate_image_url(image_path_or_url)
+            image_valid = self._validate_image_path(image_path_or_url)
         else:
             image_type = "file"
             image_valid = Path(image_path_or_url).exists()
