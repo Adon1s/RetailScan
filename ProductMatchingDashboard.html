@@ -143,40 +143,37 @@
             overflow: hidden;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             transition: all 0.3s;
+            position: relative;
         }
 
         .match-card:hover {
             box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         }
 
-        .confidence-high {
-            border-left: 5px solid #10b981;
+        .confidence-indicator {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
         }
 
-        .confidence-medium {
-            border-left: 5px solid #f59e0b;
+        .confidence-high .confidence-indicator {
+            background: #10b981;
         }
 
-        .confidence-low {
-            border-left: 5px solid #ef4444;
+        .confidence-medium .confidence-indicator {
+            background: #f59e0b;
+        }
+
+        .confidence-low .confidence-indicator {
+            background: #ef4444;
         }
 
         .match-header {
             padding: 15px 20px;
             background: #f8f9fa;
             border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
         }
 
         .confidence-badge {
@@ -200,6 +197,16 @@
             background: #ef4444;
         }
 
+        .review-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            background: #dc2626;
+            color: white;
+        }
+
         /* LLM Badges */
         .llm-badge {
             display: inline-block;
@@ -209,6 +216,7 @@
             font-weight: 600;
             cursor: help;
             transition: all 0.2s;
+            position: relative;
         }
 
         .llm-badge:hover {
@@ -246,24 +254,33 @@
             z-index: 1000;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             margin-top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
         }
 
         .llm-badge:hover .llm-rationale {
             display: block;
         }
 
-        .match-content {
-            display: grid;
-            grid-template-columns: 1fr 150px 1fr;
+        /* Product Comparison Layout */
+        .product-comparison {
+            display: flex;
+            align-items: center;
             gap: 20px;
             padding: 20px;
-            align-items: start;
         }
 
-        .product-section {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+        .product-item {
+            flex: 1;
+            position: relative;
+        }
+
+        .platform-label {
+            font-weight: bold;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            text-align: center;
         }
 
         .product-image {
@@ -273,6 +290,7 @@
             border-radius: 8px;
             overflow: hidden;
             position: relative;
+            margin-bottom: 15px;
         }
 
         .product-image img {
@@ -281,34 +299,8 @@
             object-fit: contain;
         }
 
-        .platform-badge {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 12px;
-            color: white;
-        }
-
-        .temu-badge {
-            background: #ff6b6b;
-        }
-
-        .amazon-badge {
-            background: #ff9500;
-        }
-
-        .price-tag {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-weight: bold;
+        .product-info {
+            text-align: center;
         }
 
         .product-title {
@@ -321,6 +313,14 @@
             display: -webkit-box;
             -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
+            margin-bottom: 8px;
+        }
+
+        .product-price {
+            font-size: 18px;
+            font-weight: bold;
+            color: #10b981;
+            margin-bottom: 5px;
         }
 
         .product-id {
@@ -329,92 +329,82 @@
             font-family: monospace;
         }
 
-        .match-scores {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .score-item {
-            text-align: center;
-            width: 100%;
-        }
-
-        .score-label {
-            font-size: 11px;
+        .match-arrow {
+            font-size: 24px;
             color: #666;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            flex-shrink: 0;
         }
 
-        .score-bar {
-            width: 100%;
-            height: 8px;
-            background: #e9ecef;
+        /* Find Similar Button */
+        .find-similar-btn {
+            margin-top: 10px;
+            padding: 6px 12px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
             border-radius: 4px;
-            overflow: hidden;
-            position: relative;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+            width: 100%;
         }
 
-        .score-fill {
-            height: 100%;
-            background: #667eea;
-            transition: width 0.3s ease;
+        .find-similar-btn:hover {
+            background-color: #357abd;
         }
 
-        .score-value {
-            font-size: 12px;
-            font-weight: bold;
-            margin-top: 3px;
+        .find-similar-btn:active {
+            transform: translateY(1px);
         }
 
-        /* LLM Score Section */
-        .llm-score-section {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e9ecef;
-        }
-
-        .match-actions {
+        /* Match Details */
+        .match-details {
             padding: 15px 20px;
             background: #f8f9fa;
             border-top: 1px solid #e9ecef;
             display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .price-analysis {
+            display: flex;
+            align-items: center;
             gap: 10px;
-            justify-content: flex-end;
         }
 
-        .btn-approve {
-            background: #10b981;
-        }
-
-        .btn-reject {
-            background: #ef4444;
-        }
-
-        .btn-uncertain {
-            background: #f59e0b;
-        }
-
-        /* Price difference indicator */
         .price-diff {
-            margin-top: 10px;
-            padding: 8px;
-            background: #f0fdf4;
-            border-radius: 5px;
-            font-size: 13px;
-            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .price-diff.positive {
+            color: #10b981;
         }
 
         .price-diff.negative {
-            background: #fef2f2;
-            color: #991b1b;
+            color: #ef4444;
+        }
+
+        .margin {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .match-scores {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .score-item {
+            padding: 4px 10px;
+            background: #e9ecef;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 500;
         }
 
         /* Loading */
@@ -424,43 +414,11 @@
             color: #666;
         }
 
-        /* Product links */
-        .product-section a {
-            display: inline-block;
-            margin-top: 5px;
-            text-decoration: none;
-            transition: all 0.2s;
-        }
-
-        .product-section a:hover {
-            text-decoration: underline;
-            transform: translateX(2px);
-        }
-
         /* Empty state */
         .empty-state {
             text-align: center;
             padding: 60px;
             color: #999;
-        }
-
-        /* Responsive */
-        @media (max-width: 968px) {
-            .match-content {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-
-            .match-scores {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 10px;
-                padding: 15px;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
 
         /* Export section */
@@ -471,6 +429,21 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             text-align: center;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .product-comparison {
+                flex-direction: column;
+            }
+
+            .match-arrow {
+                transform: rotate(90deg);
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
@@ -579,7 +552,7 @@
         </div>
     </div>
 
- <script>
+<script>
     // Sanitize function to match the pipeline's logic
     function sanitizeFilename(filename) {
         // Remove special characters except alphanumeric, spaces, underscores, and hyphens
@@ -835,83 +808,120 @@
     }
 
     // Render matches
-    // Replace the renderMatches function in your SingleItemResultsDashboard.html with this:
+    function renderMatches() {
+        const grid = document.getElementById('match-grid');
 
-function renderMatches() {
-    const grid = document.getElementById('matches-grid');
+        if (filteredMatches.length === 0) {
+            grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
+            return;
+        }
 
-    if (filteredMatches.length === 0) {
-        grid.innerHTML = '<div class="empty-state">No matches found with current filters.</div>';
-        return;
+        grid.innerHTML = filteredMatches.map((match, index) => {
+            const confClass = getConfidenceClass(match.confidence);
+            const confidencePercent = (match.confidence * 100).toFixed(1);
+            const temuTitle = match.temu_title || '';
+            const amazonTitle = match.amazon_title || '';
+            const temuPrice = match.temu_price || match.price || 0;
+            const amazonPrice = match.amazon_price || 0;
+            const priceDiff = amazonPrice - temuPrice;
+            const margin = temuPrice > 0 ? (priceDiff / temuPrice * 100) : 0;
+
+            return `
+                <div class="match-card ${confClass} ${match.needs_review ? 'needs-review' : ''}" data-match-index="${index}">
+                    <div class="confidence-indicator"></div>
+
+                    <div class="match-header">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span class="confidence-badge">${confidencePercent}%</span>
+                            ${match.needs_review ? '<span class="review-badge">Needs Review</span>' : ''}
+                            ${getLLMBadge(match)}
+                        </div>
+                    </div>
+
+                    <div class="product-comparison">
+                        <div class="product-item temu-product">
+                            <div class="platform-label">TEMU</div>
+                            <div class="product-image">
+                                <img src="./temu_${CATEGORY_SLUG}_imgs/${match.temu_id}.jpg"
+                                     alt="${temuTitle}"
+                                     onerror="this.src='placeholder.png'">
+                            </div>
+                            <div class="product-info">
+                                <div class="product-title">${temuTitle}</div>
+                                <div class="product-price">$${temuPrice.toFixed(2)}</div>
+                                <div class="product-id">ID: ${match.temu_id}</div>
+                            </div>
+                            <button class="find-similar-btn" onclick="findSimilarProducts('temu', '${match.temu_id}', '${encodeURIComponent(temuTitle)}', ${temuPrice})">
+                                🔍 Find Similar
+                            </button>
+                        </div>
+
+                        <div class="match-arrow">➜</div>
+
+                        <div class="product-item amazon-product">
+                            <div class="platform-label">AMAZON</div>
+                            <div class="product-image">
+                                <img src="./amazon_${CATEGORY_SLUG}_imgs/${match.amazon_id}.jpg"
+                                     alt="${amazonTitle}"
+                                     onerror="this.src='placeholder.png'">
+                            </div>
+                            <div class="product-info">
+                                <div class="product-title">${amazonTitle}</div>
+                                <div class="product-price">$${amazonPrice.toFixed(2)}</div>
+                                <div class="product-id">ID: ${match.amazon_id}</div>
+                            </div>
+                            <button class="find-similar-btn" onclick="findSimilarProducts('amazon', '${match.amazon_id}', '${encodeURIComponent(amazonTitle)}', ${amazonPrice})">
+                                🔍 Find Similar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="match-details">
+                        <div class="price-analysis">
+                            <span class="price-diff ${priceDiff > 0 ? 'positive' : 'negative'}">
+                                ${priceDiff >= 0 ? '+' : ''}$${priceDiff.toFixed(2)}
+                            </span>
+                            <span class="margin">(${margin >= 0 ? '+' : ''}${margin.toFixed(1)}%)</span>
+                        </div>
+
+                        <div class="match-scores">
+                            ${match.scores ? `
+                                ${match.scores.title_similarity !== undefined ? `<span class="score-item">Title: ${match.scores.title_similarity.toFixed(2)}</span>` : ''}
+                                ${match.scores.embedding_similarity !== undefined ? `<span class="score-item">Embed: ${match.scores.embedding_similarity.toFixed(2)}</span>` : ''}
+                                ${match.scores.image_similarity !== undefined ? `<span class="score-item">Image: ${match.scores.image_similarity.toFixed(2)}</span>` : ''}
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
-    grid.innerHTML = filteredMatches.map((match, index) => {
-        const confClass = getConfidenceClass(match.confidence);
-        const confidencePercent = (match.confidence * 100).toFixed(1);
-        const platformClass = match.platform.toLowerCase();
-        const imageDir = match.platform === 'temu' ? 'temu' : 'amazon';
+    // Add the new function to handle Find Similar button clicks
+    function findSimilarProducts(platform, productId, title, price) {
+        // Decode the title
+        const decodedTitle = decodeURIComponent(title);
 
-        // Get category from metadata for image paths
-        const category = matchData.metadata?.category || 'products';
+        // Construct the image path
+        const imagePath = `./${platform}_${CATEGORY_SLUG}_imgs/${productId}.jpg`;
 
-        return `
-            <div class="match-card">
-                <div class="confidence-indicator ${confClass}"></div>
-                <span class="platform-badge ${platformClass}-badge">${match.platform.toUpperCase()}</span>
+        // Store the product data in sessionStorage for the single item dashboard
+        const productData = {
+            title: decodedTitle,
+            platform: platform,
+            productId: productId,
+            price: price,
+            imagePath: imagePath,
+            category: CATEGORY_NAME,
+            categorySlug: CATEGORY_SLUG,
+            fromDashboard: true
+        };
 
-                <div class="match-image" data-match-index="${index}">
-                    <img src="./${imageDir}_${category}_imgs/${match.product_id}.jpg"
-                         alt="${match.title}"
-                         data-match-index="${index}" />
-                    <span class="price-tag">$${match.price.toFixed(2)}</span>
-                </div>
+        sessionStorage.setItem('singleItemSearchData', JSON.stringify(productData));
 
-                <div class="match-content">
-                    <div class="match-title">${match.title}</div>
-
-                    <div class="match-scores">
-                        ${match.scores ? `
-                            ${match.scores.fuzzy ? `<span class="score-chip">📝 Text: ${match.scores.fuzzy.toFixed(0)}%</span>` : ''}
-                            ${match.scores.embedding ? `<span class="score-chip">🧠 Semantic: ${(match.scores.embedding * 100).toFixed(0)}%</span>` : ''}
-                            ${match.scores.image ? `<span class="score-chip">🖼️ Image: ${(match.scores.image * 100).toFixed(0)}%</span>` : ''}
-                        ` : ''}
-                    </div>
-
-                    <div class="confidence-display">
-                        <div class="confidence-value">${confidencePercent}%</div>
-                        <div class="confidence-label">Match Confidence</div>
-                    </div>
-
-                    ${match.llm_processed !== undefined ? `
-                        <div class="llm-badge ${match.llm_same_product ? 'llm-same' : 'llm-different'}">
-                            ${match.llm_same_product ? '✓ Same Product' : '✗ Different Product'}
-                        </div>
-                    ` : ''}
-
-                    <div class="match-actions">
-                        ${match.platform === 'amazon' ?
-                            `<a href="https://www.amazon.com/dp/${match.product_id}" target="_blank">View on Amazon</a>` :
-                            `<a href="https://www.temu.com/search_result.html?search_key=${match.product_id}" target="_blank">Search on Temu</a>`
-                        }
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // After rendering, add error handlers to all images
-    setTimeout(() => {
-        const images = grid.querySelectorAll('.match-image img');
-        images.forEach(img => {
-            img.onerror = function() {
-                const matchIndex = this.getAttribute('data-match-index');
-                const matchImageDiv = this.parentElement;
-                matchImageDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No Image</div>' +
-                                         matchImageDiv.querySelector('.price-tag').outerHTML;
-            };
-        });
-    }, 100);
-}
+        // Open the single item search dashboard in a new tab
+        window.open('/ProductSearchDashboard.html?auto=true', '_blank');
+    }
 
     // Set decision for a match
     function setDecision(matchKey, decision) {
