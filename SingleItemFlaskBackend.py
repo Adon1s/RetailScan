@@ -589,6 +589,72 @@ def rerank_with_llm():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/single-item/match-by-id', methods=['POST'])
+def match_by_product_id():
+    """Match using an existing product ID from scraped data"""
+    try:
+        data = request.get_json()
+
+        platform = data.get('platform')
+        product_id = data.get('productId')
+        category = data.get('category')
+
+        if not all([platform, product_id, category]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+
+        # Sanitize category
+        category_slug = sanitize_filename(category)
+
+        # Load the product data
+        analysis_file = Path(f"{platform}_{category_slug}_analysis.json")
+        if not analysis_file.exists():
+            return jsonify({'error': f'No data found for {platform} {category}'}), 404
+
+        with open(analysis_file, 'r', encoding='utf-8') as f:
+            platform_data = json.load(f)
+
+        # Find the product
+        products = platform_data.get('all_products', platform_data.get('products', []))
+        target_product = None
+
+        for product in products:
+            if product.get('id') == product_id:
+                target_product = product
+                break
+
+        if not target_product:
+            return jsonify({'error': 'Product not found'}), 404
+
+        # Use the product data for matching
+        title = target_product.get('title', '')
+        image_path = f"./{platform}_{category_slug}_imgs/{product_id}.jpg"
+
+        # Initialize matcher and perform matching
+        matcher_instance = initialize_matcher(use_images=True)
+
+        results = matcher_instance.find_matches(
+            title=title,
+            image_path_or_url=image_path,
+            category_name=category_slug,
+            top_n=50
+        )
+
+        results['success'] = True
+        results['input_item'] = {
+            'title': title,
+            'image_path': image_path,
+            'category': category,
+            'platform': platform,
+            'product_id': product_id
+        }
+
+        return jsonify(results)
+
+    except Exception as e:
+        logger.error(f"Error in match-by-id endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
 # Save results endpoint
 @app.route('/api/single-item/save-results', methods=['POST'])
 def save_results():

@@ -593,6 +593,25 @@
         // Initialize dashboard
         async function init() {
             try {
+                // Check if we came from the main dashboard
+                const urlParams = new URLSearchParams(window.location.search);
+                const isAuto = urlParams.get('auto') === 'true';
+
+                if (isAuto) {
+                    // Check for data from the main dashboard
+                    const storedData = sessionStorage.getItem('singleItemSearchData');
+                    if (storedData) {
+                        const searchData = JSON.parse(storedData);
+                        console.log('Auto-loading search data:', searchData);
+
+                        // Clear the stored data
+                        sessionStorage.removeItem('singleItemSearchData');
+
+                        // Trigger the Flask backend search
+                        await performAutoSearch(searchData);
+                        return; // Exit early as performAutoSearch will handle everything
+                    }
+                }
                 // Check for filename in URL
                 const filename = getFileFromURL();
 
@@ -646,6 +665,117 @@
                     '<div class="empty-state">Error loading match results. Please ensure the file exists.</div>';
             }
         }
+
+        // Add this function before the init() function
+async function performAutoSearch(searchData) {
+    try {
+        // Show loading state
+        document.getElementById('matches-grid').innerHTML = '<div class="loading">Starting automatic search...</div>';
+
+        // Display the input item section
+        document.getElementById('input-item-section').style.display = 'block';
+        document.getElementById('input-title').textContent = searchData.title;
+        document.getElementById('input-category').textContent = searchData.category;
+        document.getElementById('search-date').textContent = new Date().toLocaleDateString();
+
+        // Set the image
+        if (searchData.imagePath) {
+            const imgElement = document.getElementById('input-img');
+            imgElement.src = searchData.imagePath;
+            imgElement.onerror = function() {
+                this.style.display = 'none';
+                this.parentElement.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Image not available</div>';
+            };
+        }
+
+        // Update loading message
+        document.getElementById('matches-grid').innerHTML = '<div class="loading">Searching for similar products...</div>';
+
+        // Use the match-by-id endpoint (ALTERNATIVE APPROACH)
+        const response = await fetch('http://localhost:5000/api/single-item/match-by-id', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                platform: searchData.platform,
+                productId: searchData.productId,
+                category: searchData.categorySlug
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success && result.matches) {
+            // Store the match data
+            matchData = {
+                input_item: result.input_item || searchData,
+                matches: result.matches,
+                metadata: {
+                    category: searchData.category,
+                    timestamp: new Date().toISOString(),
+                    total_products_checked: result.metadata?.total_products_checked || 0,
+                    use_images: true
+                }
+            };
+
+            matches = matchData.matches || [];
+
+            // Update stats and render
+            updateStats();
+            applyFilters();
+            renderMatches();
+            setupEventListeners();
+
+            // Optional: Save results automatically
+            saveResultsAutomatically();
+        } else {
+            throw new Error(result.error || 'Search failed');
+        }
+
+    } catch (error) {
+        console.error('Auto search error:', error);
+        document.getElementById('matches-grid').innerHTML =
+            `<div class="empty-state">Error performing search: ${error.message}<br>Please try again or load a results file.</div>`;
+    }
+}
+
+// Optional: Auto-save results
+async function saveResultsAutomatically() {
+    if (!matchData) return;
+
+    try {
+        const saveData = {
+            input_item: matchData.input_item,
+            matches: matchData.matches,
+            metadata: matchData.metadata
+        };
+
+        const response = await fetch('http://localhost:5000/api/single-item/save-results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(saveData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Results auto-saved to:', result.filename);
+
+            // Update URL to include the filename
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('file', result.filename);
+            window.history.replaceState({}, '', newUrl);
+        }
+    } catch (error) {
+        console.error('Error auto-saving results:', error);
+    }
+}
 
         // Prompt for file (fallback if URL parameter fails)
         async function promptForFile() {
@@ -842,8 +972,10 @@
                 const safeTitle = escapeHtml(match.title || '');
                 const priceText = (typeof match.price === 'number') ? match.price.toFixed(2) : '0.00';
 
-                // Get category from metadata for image paths
-                const category = matchData.metadata?.category || 'products';
+                // Get category slug from metadata for image paths
+                const categorySlug = matchData.metadata?.categorySlug || matchData.metadata?.category || 'products';
+                // If categorySlug is not available, sanitize the category name
+                const category = categorySlug.includes(' ') ? categorySlug.replace(/\s+/g, '_').toLowerCase() : categorySlug;
 
         return `
             <div class="match-card">
@@ -851,7 +983,7 @@
                 <span class="platform-badge ${platformClass}-badge">${match.platform.toUpperCase()}</span>
 
                 <div class="match-image">
-                    <img src="./${imageDir}_${category}_imgs/${match.product_id}.jpg"
+                    <img src="./${imageDir}_${category}_imgs/${match.id}.jpg"
                          alt="${safeTitle}"
                          onerror="this.style.display='none'; this.parentElement.innerHTML+='<div style=&quot;padding:20px;text-align:center;color:#999;&quot;>No Image</div>'" />
                     <span class="price-tag">$${priceText}</span>
@@ -881,8 +1013,8 @@
 
                     <div class="match-actions">
                         ${match.platform === 'amazon'
-                            ? `<a href="https://www.amazon.com/dp/${match.product_id}" target="_blank">View on Amazon</a>`
-                            : `<a href="https://www.temu.com/search_result.html?search_key=${match.product_id}" target="_blank">Search on Temu</a>`
+                            ? `<a href="https://www.amazon.com/dp/${match.id}" target="_blank">View on Amazon</a>`
+                            : `<a href="https://www.temu.com/search_result.html?search_key=${match.id}" target="_blank">Search on Temu</a>`
                         }
                     </div>
                 </div>

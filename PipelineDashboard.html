@@ -816,9 +816,9 @@
 
         // Open dashboard
         function openDashboard() {
-            // Open the existing dashboard in a new tab
-            // The dashboard will prompt for category on load
-            window.open('ProductMatchingDashboard.html', '_blank');
+            // When the pipeline completes successfully, and you want to open the results
+            // Assuming you have the search terms in a variable called searchTerms
+            window.open(`/ProductMatchingDashboard.html?category=${encodeURIComponent(searchTerms)}`, '_blank');
         }
 
         // Event listeners
