@@ -543,353 +543,375 @@
         </div>
     </div>
 
-    <script>
-        // Pipeline state management
-        let pipelineRunning = false;
-        let pipelineProcess = null;
-        let startTime = null;
+   <script>
+    // Pipeline state management
+    let pipelineRunning = false;
+    let pipelineProcess = null;
+    let startTime = null;
+    let eventSource = null; // Store EventSource globally
 
-        // DOM elements
-        const startButton = document.getElementById('startButton');
-        const stopButton = document.getElementById('stopButton');
-        const searchInput = document.getElementById('searchInput');
-        const skipScraping = document.getElementById('skipScraping');
-        const skipLLM = document.getElementById('skipLLM');
-        const pagesInput = document.getElementById('pagesInput');
-        const progressSection = document.getElementById('progressSection');
-        const progressBar = document.getElementById('progressBar');
-        const currentStep = document.getElementById('currentStep');
-        const logOutput = document.getElementById('logOutput');
-        const statusIndicator = document.getElementById('statusIndicator');
-        const resultsSummary = document.getElementById('resultsSummary');
-        const dashboardButton = document.getElementById('dashboardButton');
+    // DOM elements
+    const startButton = document.getElementById('startButton');
+    const stopButton = document.getElementById('stopButton');
+    const searchInput = document.getElementById('searchInput');
+    const skipScraping = document.getElementById('skipScraping');
+    const skipLLM = document.getElementById('skipLLM');
+    const pagesInput = document.getElementById('pagesInput');
+    const progressSection = document.getElementById('progressSection');
+    const progressBar = document.getElementById('progressBar');
+    const currentStep = document.getElementById('currentStep');
+    const logOutput = document.getElementById('logOutput');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const resultsSummary = document.getElementById('resultsSummary');
+    const dashboardButton = document.getElementById('dashboardButton');
 
-        // Pipeline steps for progress tracking
-        const pipelineSteps = [
-            { id: 'init', name: 'Initialization', weight: 5 },
-            { id: 'scrape_temu', name: 'Scraping Temu', weight: 20 },
-            { id: 'scrape_amazon', name: 'Scraping Amazon', weight: 20 },
-            { id: 'organize_temu', name: 'Organizing Temu Data', weight: 10 },
-            { id: 'organize_amazon', name: 'Organizing Amazon Data', weight: 10 },
-            { id: 'matching', name: 'Product Matching', weight: 20 },
-            { id: 'llm', name: 'LLM Analysis', weight: 10 },
-            { id: 'complete', name: 'Complete', weight: 5 }
-        ];
+    // Pipeline steps for progress tracking
+    const pipelineSteps = [
+        { id: 'init', name: 'Initialization', weight: 5 },
+        { id: 'scrape_temu', name: 'Scraping Temu', weight: 20 },
+        { id: 'scrape_amazon', name: 'Scraping Amazon', weight: 20 },
+        { id: 'organize_temu', name: 'Organizing Temu Data', weight: 10 },
+        { id: 'organize_amazon', name: 'Organizing Amazon Data', weight: 10 },
+        { id: 'matching', name: 'Product Matching', weight: 20 },
+        { id: 'llm', name: 'LLM Analysis', weight: 10 },
+        { id: 'complete', name: 'Complete', weight: 5 }
+    ];
 
-        let currentStepIndex = 0;
-        let stepProgress = {};
+    let currentStepIndex = 0;
+    let stepProgress = {};
 
-        // Initialize step progress
-        function initializeProgress() {
-            stepProgress = {};
-            pipelineSteps.forEach(step => {
-                stepProgress[step.id] = 0;
-            });
-            currentStepIndex = 0;
-            updateProgressBar();
-        }
+    // Initialize step progress
+    function initializeProgress() {
+        stepProgress = {};
+        pipelineSteps.forEach(step => {
+            stepProgress[step.id] = 0;
+        });
+        currentStepIndex = 0;
+        updateProgressBar();
+    }
 
-        // Calculate total progress
-        function calculateTotalProgress() {
-            let totalProgress = 0;
-            let totalWeight = 0;
+    // Calculate total progress
+    function calculateTotalProgress() {
+        let totalProgress = 0;
+        let totalWeight = 0;
 
-            pipelineSteps.forEach(step => {
-                if (skipScraping.checked && (step.id === 'scrape_temu' || step.id === 'scrape_amazon')) {
-                    // Skip these steps
-                    return;
-                }
-                if (skipLLM.checked && step.id === 'llm') {
-                    // Skip LLM step
-                    return;
-                }
-                totalProgress += (stepProgress[step.id] || 0) * step.weight;
-                totalWeight += step.weight;
-            });
-
-            return totalWeight > 0 ? (totalProgress / totalWeight) : 0;
-        }
-
-        // Update progress bar
-        function updateProgressBar() {
-            const progress = calculateTotalProgress();
-            progressBar.style.width = `${progress}%`;
-        }
-
-        // Add log entry
-        function addLogEntry(message, type = 'info') {
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-
-            const timestamp = new Date().toLocaleTimeString();
-            entry.textContent = `[${timestamp}] ${message}`;
-
-            logOutput.appendChild(entry);
-            logOutput.scrollTop = logOutput.scrollHeight;
-        }
-
-        // Update current step display
-        function updateCurrentStep(stepId, progress = 0) {
-            const step = pipelineSteps.find(s => s.id === stepId);
-            if (step) {
-                currentStep.textContent = `${step.name} (${Math.round(progress)}%)`;
-                stepProgress[stepId] = progress;
-                updateProgressBar();
+        pipelineSteps.forEach(step => {
+            if (skipScraping.checked && (step.id === 'scrape_temu' || step.id === 'scrape_amazon')) {
+                // Skip these steps
+                return;
             }
-        }
-
-        // Parse log output to detect progress
-        function parseLogOutput(output) {
-            // Detect which step we're in based on output patterns
-            if (output.includes('Starting Temu-Amazon Product Matching Pipeline')) {
-                updateCurrentStep('init', 100);
-            } else if (output.includes('Scraping Temu products')) {
-                updateCurrentStep('scrape_temu', 50);
-            } else if (output.includes('✓') && output.includes('Temu scraping completed')) {
-                updateCurrentStep('scrape_temu', 100);
-            } else if (output.includes('Scraping Amazon products')) {
-                updateCurrentStep('scrape_amazon', 50);
-            } else if (output.includes('✓') && output.includes('Amazon scraping completed')) {
-                updateCurrentStep('scrape_amazon', 100);
-            } else if (output.includes('Organizing Temu data')) {
-                updateCurrentStep('organize_temu', 50);
-            } else if (output.includes('✓') && output.includes('Organizing Temu data completed')) {
-                updateCurrentStep('organize_temu', 100);
-            } else if (output.includes('Organizing Amazon data')) {
-                updateCurrentStep('organize_amazon', 50);
-            } else if (output.includes('✓') && output.includes('Organizing Amazon data completed')) {
-                updateCurrentStep('organize_amazon', 100);
-            } else if (output.includes('Product Matching')) {
-                updateCurrentStep('matching', 50);
-            } else if (output.includes('matching completed successfully')) {
-                updateCurrentStep('matching', 100);
-            } else if (output.includes('LLM Enhancement')) {
-                updateCurrentStep('llm', 50);
-            } else if (output.includes('LLM enhancement complete') || output.includes('Enrichment complete!')) {
-                updateCurrentStep('llm', 100);
-            } else if (output.includes('Pipeline completed')) {
-                updateCurrentStep('complete', 100);
-            }
-
-            // Detect log level
-            let logType = 'info';
-            if (output.includes('[ERROR]') || output.includes('✗')) {
-                logType = 'error';
-            } else if (output.includes('[WARNING]')) {
-                logType = 'warning';
-            } else if (output.includes('✓')) {
-                logType = 'success';
-            }
-
-            addLogEntry(output, logType);
-        }
-
-        // Start pipeline
-        async function startPipeline() {
-            if (pipelineRunning) return;
-
-            const searchTerms = searchInput.value.trim();
-            if (!searchTerms) {
-                alert('Please enter search terms');
+            if (skipLLM.checked && step.id === 'llm') {
+                // Skip LLM step
                 return;
             }
 
-            pipelineRunning = true;
-            startTime = Date.now();
-
-            // Update UI
-            startButton.disabled = true;
-            stopButton.style.display = 'inline-flex';
-            progressSection.style.display = 'block';
-            resultsSummary.style.display = 'none';
-            logOutput.innerHTML = '';
-
-            // Initialize progress
-            initializeProgress();
-
-            // Update status
-            statusIndicator.className = 'status-indicator running';
-            statusIndicator.innerHTML = '<span class="spinner"></span> Running';
-
-            try {
-                // Call backend API to start pipeline
-                const response = await fetch('/api/pipeline/start', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        searchTerms: searchTerms,
-                        skipScraping: skipScraping.checked,
-                        skipLLM: skipLLM.checked,
-                        numPages: parseInt(pagesInput.value) || 1
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to start pipeline');
-                }
-
-                // Set up EventSource for real-time updates
-                const eventSource = new EventSource('/api/pipeline/stream');
-
-                eventSource.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-
-                    if (data.type === 'log') {
-                        parseLogOutput(data.message);
-                    } else if (data.type === 'complete') {
-                        completePipeline(data.results);
-                        eventSource.close();
-                    } else if (data.type === 'error') {
-                        handlePipelineError(data.message);
-                        eventSource.close();
-                    }
-                };
-
-                eventSource.onerror = (error) => {
-                    handlePipelineError('Connection lost');
-                    eventSource.close();
-                };
-
-            } catch (error) {
-                handlePipelineError(error.message);
-            }
-        }
-
-        // Complete pipeline
-        function completePipeline(results) {
-            pipelineRunning = false;
-            const endTime = Date.now();
-            const duration = Math.round((endTime - startTime) / 1000);
-
-            // Update UI
-            startButton.disabled = false;
-            stopButton.style.display = 'none';
-
-            // Update status
-            statusIndicator.className = 'status-indicator completed';
-            statusIndicator.innerHTML = '✅ Completed';
-
-            // Show results summary
-            if (results) {
-                document.getElementById('totalMatches').textContent = results.totalMatches || 0;
-                document.getElementById('highConfidence').textContent = results.highConfidence || 0;
-                document.getElementById('processingTime').textContent = `${duration}s`;
-                document.getElementById('llmProcessed').textContent = results.llmProcessed || 0;
-
-                resultsSummary.style.display = 'block';
-            }
-
-            addLogEntry(`Pipeline completed in ${duration} seconds`, 'success');
-        }
-
-        // Handle pipeline error
-        function handlePipelineError(error) {
-            pipelineRunning = false;
-
-            // Update UI
-            startButton.disabled = false;
-            stopButton.style.display = 'none';
-
-            // Update status
-            statusIndicator.className = 'status-indicator error';
-            statusIndicator.innerHTML = '❌ Error';
-
-            addLogEntry(`Error: ${error}`, 'error');
-        }
-
-        // Stop pipeline
-        async function stopPipeline() {
-            if (!pipelineRunning) return;
-
-            try {
-                await fetch('/api/pipeline/stop', {
-                    method: 'POST'
-                });
-
-                handlePipelineError('Pipeline stopped by user');
-            } catch (error) {
-                console.error('Failed to stop pipeline:', error);
-            }
-        }
-
-        // Open dashboard
-        function openDashboard() {
-            // When the pipeline completes successfully, and you want to open the results
-            // Assuming you have the search terms in a variable called searchTerms
-            window.open(`/ProductMatchingDashboard.html?category=${encodeURIComponent(searchTerms)}`, '_blank');
-        }
-
-        // Event listeners
-        startButton.addEventListener('click', startPipeline);
-        stopButton.addEventListener('click', stopPipeline);
-        dashboardButton.addEventListener('click', openDashboard);
-
-        // Enter key to start
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !pipelineRunning) {
-                startPipeline();
-            }
+            totalProgress += (stepProgress[step.id] || 0) * step.weight;
+            totalWeight += step.weight;
         });
 
-        // Toggle pages input based on skip scraping
-        skipScraping.addEventListener('change', () => {
-            pagesInput.disabled = skipScraping.checked;
+        return totalWeight > 0 ? (totalProgress / totalWeight) : 0;
+    }
+
+        // Sanitize function to match the pipeline's logic
+    function sanitizeFilename(filename) {
+        // Remove special characters except alphanumeric, spaces, underscores, and hyphens
+        let sanitized = filename.replace(/[^\w\s_-]/g, '');
+        // Replace spaces and hyphens with underscores
+        sanitized = sanitized.replace(/[-\s]+/g, '_');
+        return sanitized.toLowerCase();
+    }
+
+    // Update progress bar
+    function updateProgressBar() {
+        const progress = calculateTotalProgress();
+        progressBar.style.width = `${progress}%`;
+    }
+
+    // Add log entry
+    function addLogEntry(message, type = 'info') {
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+
+        const timestamp = new Date().toLocaleTimeString();
+        entry.textContent = `[${timestamp}] ${message}`;
+
+        logOutput.appendChild(entry);
+        logOutput.scrollTop = logOutput.scrollHeight;
+    }
+
+    // Add log message (alias for compatibility)
+    function addLogMessage(message, type = 'info') {
+        addLogEntry(message, type);
+    }
+
+    // Update status indicator
+    function updateStatus(message, type = 'info') {
+        const statusClasses = {
+            'info': 'status-indicator info',
+            'success': 'status-indicator completed',
+            'error': 'status-indicator error',
+            'warning': 'status-indicator warning'
+        };
+
+        statusIndicator.className = statusClasses[type] || 'status-indicator info';
+
+        if (type === 'success') {
+            statusIndicator.innerHTML = '✅ ' + message;
+        } else if (type === 'error') {
+            statusIndicator.innerHTML = '❌ ' + message;
+        } else {
+            statusIndicator.innerHTML = message;
+        }
+    }
+
+    // Display results summary
+    function displayResults(results) {
+        if (results) {
+            document.getElementById('totalMatches').textContent = results.totalMatches || 0;
+            document.getElementById('highConfidence').textContent = results.highConfidence || 0;
+            document.getElementById('llmProcessed').textContent = results.llmProcessed || 0;
+
+            const duration = Math.round((Date.now() - startTime) / 1000);
+            document.getElementById('processingTime').textContent = `${duration}s`;
+
+            resultsSummary.style.display = 'block';
+        }
+    }
+
+    // Update current step display
+    function updateCurrentStep(stepId, progress = 0) {
+        const step = pipelineSteps.find(s => s.id === stepId);
+        if (step) {
+            currentStep.textContent = `${step.name} (${Math.round(progress)}%)`;
+            stepProgress[stepId] = progress;
+            updateProgressBar();
+        }
+    }
+
+    // Parse log output to detect progress
+    function parseLogOutput(output) {
+        // Detect which step we're in based on output patterns
+        if (output.includes('Starting Temu-Amazon Product Matching Pipeline')) {
+            updateCurrentStep('init', 100);
+        } else if (output.includes('Scraping Temu products') || output.includes('Starting temu scraper')) {
+            updateCurrentStep('scrape_temu', 50);
+        } else if (output.includes('✓') && output.includes('Temu scraping completed')) {
+            updateCurrentStep('scrape_temu', 100);
+        } else if (output.includes('Scraping Amazon products') || output.includes('Starting amazon scraper')) {
+            updateCurrentStep('scrape_amazon', 50);
+        } else if (output.includes('✓') && output.includes('Amazon scraping completed')) {
+            updateCurrentStep('scrape_amazon', 100);
+        } else if (output.includes('Organizing Temu data')) {
+            updateCurrentStep('organize_temu', 50);
+        } else if (output.includes('✓') && output.includes('Organizing Temu data completed')) {
+            updateCurrentStep('organize_temu', 100);
+        } else if (output.includes('Organizing Amazon data')) {
+            updateCurrentStep('organize_amazon', 50);
+        } else if (output.includes('✓') && output.includes('Organizing Amazon data completed')) {
+            updateCurrentStep('organize_amazon', 100);
+        } else if (output.includes('Product Matching') || output.includes('Incremental Product Matching')) {
+            updateCurrentStep('matching', 50);
+        } else if (output.includes('matching completed successfully')) {
+            updateCurrentStep('matching', 100);
+        } else if (output.includes('LLM Enhancement')) {
+            updateCurrentStep('llm', 50);
+        } else if (output.includes('LLM enhancement complete') || output.includes('Enrichment complete!')) {
+            updateCurrentStep('llm', 100);
+        } else if (output.includes('Pipeline completed')) {
+            updateCurrentStep('complete', 100);
+        }
+
+        // Detect log level
+        let logType = 'info';
+        if (output.includes('[ERROR]') || output.includes('✗')) {
+            logType = 'error';
+        } else if (output.includes('[WARNING]')) {
+            logType = 'warning';
+        } else if (output.includes('✓')) {
+            logType = 'success';
+        }
+
+        addLogEntry(output, logType);
+    }
+
+    // Stop pipeline
+    function stopPipeline() {
+        pipelineRunning = false;
+        startButton.disabled = false;
+        stopButton.style.display = 'none';
+
+        // Close EventSource if it exists
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+
+        // Update status if not already set
+        if (!statusIndicator.textContent.includes('completed') &&
+            !statusIndicator.textContent.includes('Error')) {
+            statusIndicator.className = 'status-indicator idle';
+            statusIndicator.textContent = 'Idle';
+        }
+
+        // Show elapsed time
+        if (startTime) {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            addLogMessage(`Total time: ${minutes}m ${seconds}s`);
+        }
+    }
+
+    // Start pipeline
+    // Start pipeline
+async function startPipeline() {
+    if (pipelineRunning) return;
+
+    const searchTerms = searchInput.value.trim();
+    if (!searchTerms) {
+        alert('Please enter search terms');
+        return;
+    }
+
+    pipelineRunning = true;
+    startTime = Date.now();
+
+    // Update UI
+    startButton.disabled = true;
+    stopButton.style.display = 'inline-flex';
+    progressSection.style.display = 'block';
+    resultsSummary.style.display = 'none';
+    logOutput.innerHTML = '';
+
+    // Initialize progress
+    initializeProgress();
+
+    // Update status
+    statusIndicator.className = 'status-indicator running';
+    statusIndicator.innerHTML = '<span class="spinner"></span> Running';
+
+    try {
+        // Call backend API to start pipeline
+        const response = await fetch('/api/pipeline/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                searchTerms: searchTerms,
+                skipScraping: skipScraping.checked,
+                skipLLM: skipLLM.checked,
+                numPages: parseInt(pagesInput.value) || 1
+            })
         });
 
-        // For development/testing - simulate pipeline without backend
-        if (window.location.search.includes('demo=true')) {
-            // Override startPipeline for demo
-            window.startPipeline = async function() {
-                pipelineRunning = true;
-                startTime = Date.now();
-
-                startButton.disabled = true;
-                stopButton.style.display = 'inline-flex';
-                progressSection.style.display = 'block';
-                resultsSummary.style.display = 'none';
-                logOutput.innerHTML = '';
-
-                initializeProgress();
-
-                statusIndicator.className = 'status-indicator running';
-                statusIndicator.innerHTML = '<span class="spinner"></span> Running';
-
-                // Simulate pipeline steps
-                const steps = [
-                    { step: 'init', message: 'Starting Temu-Amazon Product Matching Pipeline', delay: 500 },
-                    { step: 'scrape_temu', message: 'Scraping Temu products...', delay: 2000 },
-                    { step: 'scrape_temu', message: '✓ Temu scraping completed successfully', delay: 2000 },
-                    { step: 'scrape_amazon', message: 'Scraping Amazon products...', delay: 2000 },
-                    { step: 'scrape_amazon', message: '✓ Amazon scraping completed successfully', delay: 2000 },
-                    { step: 'organize_temu', message: 'Organizing Temu data...', delay: 1000 },
-                    { step: 'organize_temu', message: '✓ Organizing Temu data completed successfully', delay: 1000 },
-                    { step: 'organize_amazon', message: 'Organizing Amazon data...', delay: 1000 },
-                    { step: 'organize_amazon', message: '✓ Organizing Amazon data completed successfully', delay: 1000 },
-                    { step: 'matching', message: 'Running Product Matching...', delay: 2000 },
-                    { step: 'matching', message: 'Incremental matching completed successfully', delay: 2000 },
-                    { step: 'llm', message: 'Running LLM Enhancement...', delay: 2000 },
-                    { step: 'llm', message: 'Enrichment complete!', delay: 2000 },
-                    { step: 'complete', message: 'Pipeline completed', delay: 500 }
-                ];
-
-                for (let i = 0; i < steps.length; i++) {
-                    if (!pipelineRunning) break;
-
-                    await new Promise(resolve => setTimeout(resolve, steps[i].delay));
-                    parseLogOutput(steps[i].message);
-                }
-
-                if (pipelineRunning) {
-                    completePipeline({
-                        totalMatches: 142,
-                        highConfidence: 87,
-                        llmProcessed: 50
-                    });
-                }
-            };
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to start pipeline');
         }
-    </script>
-</body>
-</html>
+
+        // Set up EventSource for real-time updates
+        eventSource = new EventSource('/api/pipeline/stream');
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'log') {
+                parseLogOutput(data.message);
+            } else if (data.type === 'complete') {
+                updateStatus('Pipeline completed successfully!', 'success');
+                displayResults(data.results);
+
+                // Auto-open the product matching dashboard with category
+                const searchSlug = sanitizeFilename(searchTerms);
+
+                setTimeout(() => {
+                    updateStatus('Opening Product Matching Dashboard...', 'info');
+
+                    // Pass the category as URL parameter
+                    window.open(`ProductMatchingDashboard.html?category=${encodeURIComponent(searchSlug)}`, '_blank');
+                }, 1500); // 1.5 second delay
+
+                stopPipeline();
+            } else if (data.type === 'error') {
+                updateStatus(`Error: ${data.message}`, 'error');
+                addLogMessage(`ERROR: ${data.message}`, 'error');
+                stopPipeline();
+            } else if (data.type === 'heartbeat') {
+                // Ignore heartbeat messages
+            }
+        };
+
+        eventSource.onerror = function(error) {
+            console.error('EventSource error:', error);
+
+            // Only show connection lost if pipeline is still running
+            if (pipelineRunning && eventSource.readyState === EventSource.CLOSED) {
+                updateStatus('Connection lost. Pipeline may still be running.', 'warning');
+                addLogMessage('WARNING: Lost connection to pipeline stream', 'warning');
+            }
+
+            // EventSource will automatically try to reconnect unless we close it
+        };
+
+    } catch (error) {
+        console.error('Failed to start pipeline:', error);
+        updateStatus(`Failed to start pipeline: ${error.message}`, 'error');
+        stopPipeline();
+    }
+}
+
+    // Handle manual stop
+    async function handleStopPipeline() {
+        if (!pipelineRunning) return;
+
+        try {
+            const response = await fetch('/api/pipeline/stop', {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to stop pipeline');
+            }
+
+            updateStatus('Pipeline stopped by user', 'warning');
+            addLogMessage('Pipeline stopped by user request', 'warning');
+        } catch (error) {
+            console.error('Error stopping pipeline:', error);
+            addLogMessage(`Error stopping pipeline: ${error.message}`, 'error');
+        }
+
+        stopPipeline();
+    }
+
+    // Open dashboard
+    function openDashboard() {
+        // Open the existing dashboard in a new tab
+        // The dashboard will prompt for category on load
+        window.open('ProductMatchingDashboard.html', '_blank');
+    }
+
+    // Event listeners
+    startButton.addEventListener('click', startPipeline);
+    stopButton.addEventListener('click', handleStopPipeline);
+    dashboardButton.addEventListener('click', openDashboard);
+
+    // Enter key to start
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !pipelineRunning) {
+            startPipeline();
+        }
+    });
+
+    // Toggle pages input based on skip scraping
+    skipScraping.addEventListener('change', () => {
+        pagesInput.disabled = skipScraping.checked;
+    });
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+</script>
