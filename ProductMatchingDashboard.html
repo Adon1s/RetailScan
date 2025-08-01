@@ -329,6 +329,28 @@
             font-family: monospace;
         }
 
+        /* Find Similar Button */
+        .find-similar-btn {
+            margin-top: 10px;
+            padding: 6px 12px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+
+        .find-similar-btn:hover {
+            background-color: #357abd;
+        }
+
+        .find-similar-btn:active {
+            transform: translateY(1px);
+        }
+
         .match-scores {
             display: flex;
             flex-direction: column;
@@ -603,84 +625,82 @@
     let CATEGORY_SLUG = ''; // Store the sanitized category name for file paths
 
     // Initialize dashboard
-    // Update the init() function in ProductMatchingDashboard.html:
+    async function init() {
+        // Check for category in URL parameters first
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlCategory = urlParams.get('category');
 
-async function init() {
-    // Check for category in URL parameters first
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlCategory = urlParams.get('category');
+        let userInput;
 
-    let userInput;
-
-    if (urlCategory) {
-        // Category provided in URL, use it directly
-        userInput = urlCategory.replace(/_/g, ' '); // Convert underscores back to spaces for display
-        console.log(`Using category from URL: ${userInput}`);
-    } else {
-        // Prompt for category name
-        userInput = prompt(
-            "Enter the product category (e.g., 'baby toys' or 'baby_toys'):\n" +
-            "This will load files named:\n" +
-            "- matching_results_[category].json or\n" +
-            "- matching_results_enriched_[category].json"
-        );
-    }
-
-    if (!userInput) {
-        document.getElementById('match-grid').innerHTML =
-            '<div class="empty-state">No category entered. Please refresh the page and enter a category name.</div>';
-        return;
-    }
-
-    // Store both original and sanitized versions
-    CATEGORY_NAME = userInput.trim();
-    CATEGORY_SLUG = sanitizeFilename(CATEGORY_NAME);
-
-    console.log(`Original input: "${CATEGORY_NAME}", Sanitized: "${CATEGORY_SLUG}"`);
-
-    try {
-        // Try to load enriched results first, fall back to original
-        let response = await fetch(`matching_results_enriched_${CATEGORY_SLUG}.json`);
-        if (!response.ok) {
-            console.log('Enriched results not found, loading original...');
-            response = await fetch(`matching_results_${CATEGORY_SLUG}.json`);
-        }
-        const data = await response.json();
-
-        // Handle both formats: array directly or object with matches property
-        if (Array.isArray(data)) {
-            matches = data;
-        } else if (data.matches && Array.isArray(data.matches)) {
-            matches = data.matches;
+        if (urlCategory) {
+            // Category provided in URL, use it directly
+            userInput = urlCategory.replace(/_/g, ' '); // Convert underscores back to spaces for display
+            console.log(`Using category from URL: ${userInput}`);
         } else {
-            matches = [];
+            // Prompt for category name
+            userInput = prompt(
+                "Enter the product category (e.g., 'baby toys' or 'baby_toys'):\n" +
+                "This will load files named:\n" +
+                "- matching_results_[category].json or\n" +
+                "- matching_results_enriched_[category].json"
+            );
         }
 
-        console.log(`Loaded ${matches.length} matches for category: ${CATEGORY_NAME} (using files with slug: ${CATEGORY_SLUG})`);
-
-        // Check if we have LLM data
-        if (matches.some(m => m.llm_processed)) {
-            document.body.classList.add('has-llm-data');
+        if (!userInput) {
+            document.getElementById('match-grid').innerHTML =
+                '<div class="empty-state">No category entered. Please refresh the page and enter a category name.</div>';
+            return;
         }
 
-        // Load saved decisions from localStorage (use sanitized slug for consistency)
-        const saved = localStorage.getItem(`matchDecisions_${CATEGORY_SLUG}`);
-        if (saved) {
-            decisions = JSON.parse(saved);
+        // Store both original and sanitized versions
+        CATEGORY_NAME = userInput.trim();
+        CATEGORY_SLUG = sanitizeFilename(CATEGORY_NAME);
+
+        console.log(`Original input: "${CATEGORY_NAME}", Sanitized: "${CATEGORY_SLUG}"`);
+
+        try {
+            // Try to load enriched results first, fall back to original
+            let response = await fetch(`matching_results_enriched_${CATEGORY_SLUG}.json`);
+            if (!response.ok) {
+                console.log('Enriched results not found, loading original...');
+                response = await fetch(`matching_results_${CATEGORY_SLUG}.json`);
+            }
+            const data = await response.json();
+
+            // Handle both formats: array directly or object with matches property
+            if (Array.isArray(data)) {
+                matches = data;
+            } else if (data.matches && Array.isArray(data.matches)) {
+                matches = data.matches;
+            } else {
+                matches = [];
+            }
+
+            console.log(`Loaded ${matches.length} matches for category: ${CATEGORY_NAME} (using files with slug: ${CATEGORY_SLUG})`);
+
+            // Check if we have LLM data
+            if (matches.some(m => m.llm_processed)) {
+                document.body.classList.add('has-llm-data');
+            }
+
+            // Load saved decisions from localStorage (use sanitized slug for consistency)
+            const saved = localStorage.getItem(`matchDecisions_${CATEGORY_SLUG}`);
+            if (saved) {
+                decisions = JSON.parse(saved);
+            }
+
+            updateStats();
+            applyFilters();
+            renderMatches();
+        } catch (error) {
+            console.error('Error loading matches:', error);
+            document.getElementById('match-grid').innerHTML =
+                `<div class="empty-state">Error loading matching results for category '${CATEGORY_NAME}'. Please ensure matching_results_${CATEGORY_SLUG}.json is in the same directory.</div>`;
         }
 
-        updateStats();
-        applyFilters();
-        renderMatches();
-    } catch (error) {
-        console.error('Error loading matches:', error);
-        document.getElementById('match-grid').innerHTML =
-            `<div class="empty-state">Error loading matching results for category '${CATEGORY_NAME}'. Please ensure matching_results_${CATEGORY_SLUG}.json is in the same directory.</div>`;
+        // Setup event listeners
+        setupEventListeners();
     }
-
-    // Setup event listeners
-    setupEventListeners();
-}
 
     // Setup event listeners
     function setupEventListeners() {
@@ -865,6 +885,8 @@ async function init() {
             const amazonPrice = match.amazon_price || 0;
             const priceDiff = amazonPrice - temuPrice;
             const priceDiffPercent = temuPrice ? ((priceDiff / temuPrice) * 100).toFixed(0) : 0;
+            const temuTitle = match.temu_title || `Temu Product ${match.temu_id}`;
+            const amazonTitle = match.amazon_title || `Amazon Product ${match.amazon_id}`;
 
             return `
                 <div class="match-card ${confClass}" data-match-key="${matchKey}">
@@ -890,12 +912,15 @@ async function init() {
                                 <span class="platform-badge temu-badge">TEMU</span>
                                 <span class="price-tag">$${temuPrice.toFixed(2)}</span>
                                 <img src="./temu_${CATEGORY_SLUG}_imgs/${match.temu_id}.jpg"
-                                     alt="${match.temu_title || 'Temu Product'}"
+                                     alt="${temuTitle}"
                                      onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
                             </div>
-                            <div class="product-title">${match.temu_title || `Temu Product ${match.temu_id}`}</div>
+                            <div class="product-title">${temuTitle}</div>
                             <div class="product-id">ID: ${match.temu_id}</div>
                             <a href="https://www.temu.com/search_result.html?search_key=${match.temu_id}" target="_blank" style="font-size: 12px; color: #667eea;">Search on Temu →</a>
+                            <button class="find-similar-btn" onclick="findSimilarProducts('temu', '${match.temu_id}', '${encodeURIComponent(temuTitle)}', ${temuPrice})">
+                                🔍 Find Similar
+                            </button>
                         </div>
 
                         <!-- Match Scores -->
@@ -954,12 +979,15 @@ async function init() {
                                 <span class="platform-badge amazon-badge">AMAZON</span>
                                 <span class="price-tag">$${amazonPrice.toFixed(2)}</span>
                                 <img src="./amazon_${CATEGORY_SLUG}_imgs/${match.amazon_id}.jpg"
-                                     alt="${match.amazon_title || 'Amazon Product'}"
+                                     alt="${amazonTitle}"
                                      onerror="this.style.display='none'; this.parentElement.innerHTML+='<div>No Image</div>'" />
                             </div>
-                            <div class="product-title">${match.amazon_title || `Amazon Product ${match.amazon_id}`}</div>
+                            <div class="product-title">${amazonTitle}</div>
                             <div class="product-id">ASIN: ${match.amazon_id}</div>
                             <a href="https://www.amazon.com/dp/${match.amazon_id}" target="_blank" style="font-size: 12px; color: #667eea;">View on Amazon →</a>
+                            <button class="find-similar-btn" onclick="findSimilarProducts('amazon', '${match.amazon_id}', '${encodeURIComponent(amazonTitle)}', ${amazonPrice})">
+                                🔍 Find Similar
+                            </button>
                         </div>
                     </div>
 
@@ -977,6 +1005,32 @@ async function init() {
                 </div>
             `;
         }).join('');
+    }
+
+    // Add the new function to handle Find Similar button clicks
+    function findSimilarProducts(platform, productId, title, price) {
+        // Decode the title
+        const decodedTitle = decodeURIComponent(title);
+
+        // Construct the image path
+        const imagePath = `./${platform}_${CATEGORY_SLUG}_imgs/${productId}.jpg`;
+
+        // Store the product data in sessionStorage for the single item dashboard
+        const productData = {
+            title: decodedTitle,
+            platform: platform,
+            productId: productId,
+            price: price,
+            imagePath: imagePath,
+            category: CATEGORY_NAME,
+            categorySlug: CATEGORY_SLUG,
+            fromDashboard: true
+        };
+
+        sessionStorage.setItem('singleItemSearchData', JSON.stringify(productData));
+
+        // Open the single item search dashboard in a new tab
+        window.open('/ProductSearchDashboard.html?auto=true', '_blank');
     }
 
     // Set decision for a match
