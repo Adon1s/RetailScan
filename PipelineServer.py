@@ -134,7 +134,7 @@ def status():
         'status': 'running',
         'pipeline_running': pipeline_running,
         'local_ip': local_ip,
-        'port': request.environ.get('SERVER_PORT', 5000),
+        'port': request.environ.get('SERVER_PORT', 5001),
         'timestamp': datetime.now().isoformat()
     })
 
@@ -296,7 +296,7 @@ def serve_static(path):
 def main():
     parser = argparse.ArgumentParser(description="Pipeline API Server")
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
-    parser.add_argument('--port', type=int, default=5000, help='Port to bind to')
+    parser.add_argument('--port', type=int, default=5001, help='Port to bind to')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
 
     args = parser.parse_args()
