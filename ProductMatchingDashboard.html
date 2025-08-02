@@ -1008,30 +1008,32 @@
     }
 
     // Add the new function to handle Find Similar button clicks
-    function findSimilarProducts(platform, productId, title, price) {
-        // Decode the title
-        const decodedTitle = decodeURIComponent(title);
+    // Add the new function to handle Find Similar button clicks
+function findSimilarProducts(platform, productId, title, price) {
+    // Decode the title
+    const decodedTitle = decodeURIComponent(title);
 
-        // Construct the image path
-        const imagePath = `./${platform}_${CATEGORY_SLUG}_imgs/${productId}.jpg`;
+    // Construct the API URL for the image
+    // This assumes ProductSearchDashboard is served from localhost:5000
+    const imageUrl = `http://localhost:5000/api/product-image/${platform}/${CATEGORY_SLUG}/${productId}.jpg`;
 
-        // Store the product data in sessionStorage for the single item dashboard
-        const productData = {
-            title: decodedTitle,
-            platform: platform,
-            productId: productId,
-            price: price,
-            imagePath: imagePath,
-            category: CATEGORY_NAME,
-            categorySlug: CATEGORY_SLUG,
-            fromDashboard: true
-        };
+    // Store the product data in sessionStorage with the API URL
+    const productData = {
+        title: decodedTitle,
+        platform: platform,
+        productId: productId,
+        price: price,
+        imagePath: imageUrl, // Now this is a proper URL that will work
+        category: CATEGORY_NAME,
+        categorySlug: CATEGORY_SLUG,
+        fromDashboard: true
+    };
 
-        sessionStorage.setItem('singleItemSearchData', JSON.stringify(productData));
+    sessionStorage.setItem('singleItemSearchData', JSON.stringify(productData));
 
-        // Open the single item search dashboard in a new tab
-        window.open('/ProductSearchDashboard.html?auto=true', '_blank');
-    }
+    // Open the single item search dashboard in a new tab
+    window.open('/ProductSearchDashboard.html?auto=true', '_blank');
+}
 
     // Set decision for a match
     function setDecision(matchKey, decision) {
