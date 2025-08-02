@@ -1361,6 +1361,9 @@ function updateProgressBar() {
                 imageSource = selectedFile;
             } else if (inputType === 'url') {
                 imageSource = imageUrlInput.value.trim();
+                    const imageGroup = urlInputWrapper.closest('.input-group');
+    imageGroup.appendChild(imagePreview);
+    imagePreview.style.display = 'block';
                 if (!imageSource) {
                     alert('Please enter an image URL');
                     return;
@@ -1631,7 +1634,7 @@ function updateProgressBar() {
             loadCategories();
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
     // Check if we're coming from the matching dashboard
     const urlParams = new URLSearchParams(window.location.search);
     const isAuto = urlParams.get('auto') === 'true';
@@ -1644,38 +1647,79 @@ function updateProgressBar() {
             const productData = JSON.parse(savedData);
 
             // Auto-populate the form
-            document.getElementById('product-title').value = productData.title;
-            document.getElementById('category-select').value = productData.categorySlug;
+            titleInput.value = productData.title;
 
-            // Handle the image
-            if (productData.imagePath) {
-                // Show image preview
-                const imagePreview = document.getElementById('image-preview');
-                if (imagePreview) {
-                    imagePreview.innerHTML = `
-                        <img src="${productData.imagePath}" alt="Product Image" style="max-width: 200px; max-height: 200px;">
-                        <p>Image from ${productData.platform.toUpperCase()} product</p>
-                    `;
-                    imagePreview.style.display = 'block';
-                }
+            // Handle category
+            categorySelect.value = productData.categorySlug;
 
-                // Store the image path for the search
-                // You might need to modify this based on your actual form structure
-                const imageUrlInput = document.getElementById('image-url');
-                if (imageUrlInput) {
-                    imageUrlInput.value = productData.imagePath;
-                }
+            // If category doesn't exist in the dropdown, we might need to handle it differently
+            if (!categorySelect.value && productData.categorySlug) {
+                // The category might not be in the list, so show the scrape option
+                scrapeFreshData.checked = true;
+                scrapeSection.style.display = 'block';
+                categoryGroup.style.display = 'none';
+                searchTermsInput.value = productData.category; // Use the original category name
+                numPagesInput.value = 1; // Default to 1 page
             }
 
+            // Handle the image - CHECK IF IT'S A LOCAL PATH
+            // Handle the image
+if (productData.imagePath) {
+    // Check if it's a data URL
+    if (productData.imagePath.startsWith('data:')) {
+        // It's a data URL, we can use it directly
+        inputType = 'url';
+        urlInputBtn.classList.add('active');
+        fileInputBtn.classList.remove('active');
+        urlInputWrapper.style.display = 'block';
+        fileInputWrapper.style.display = 'none';
+
+const container = document.querySelector('.input-group');  // or urlInputWrapper.parentElement
+container.appendChild(imagePreview);
+imagePreview.style.display = 'block';
+previewImg.src = productData.imagePath;
+
+        // Show image preview
+        previewImg.src = productData.imagePath;
+        imagePreview.style.display = 'block';
+    } else if (productData.imagePath.startsWith('http')) {
+        // It's a full URL, proceed as normal
+        inputType = 'url';
+        urlInputBtn.classList.add('active');
+        fileInputBtn.classList.remove('active');
+        urlInputWrapper.style.display = 'block';
+        fileInputWrapper.style.display = 'none';
+
+const container = document.querySelector('.input-group');  // or urlInputWrapper.parentElement
+container.appendChild(imagePreview);
+imagePreview.style.display = 'block';
+previewImg.src = productData.imagePath;
+
+        // Show image preview
+        previewImg.src = productData.imagePath;
+        imagePreview.style.display = 'block';
+    } else {
+        // It's a local path, show warning
+        const notice = document.createElement('div');
+        notice.style.cssText = 'background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 10px; margin: 10px 0; border-radius: 4px;';
+        notice.innerHTML = '⚠️ Note: Product image could not be loaded. Please upload an image manually.';
+        imagePreview.parentNode.insertBefore(notice, imagePreview);
+    }
+}
+
             // Update UI to show where this search came from
-            const searchHeader = document.querySelector('.search-header');
-            if (searchHeader) {
-                searchHeader.insertAdjacentHTML('afterbegin', `
-                    <div class="auto-search-notice">
-                        🔍 Finding products similar to: <strong>${productData.platform.toUpperCase()} - ${productData.title.substring(0, 50)}...</strong>
-                        <button onclick="clearAutoSearch()" style="margin-left: 10px;">Clear</button>
+            const header = document.querySelector('.header');
+            if (header) {
+                const notice = document.createElement('div');
+                notice.className = 'auto-search-notice';
+                notice.style.cssText = 'background-color: #e3f2fd; border: 1px solid #1976d2; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size: 14px; display: flex; align-items: center; justify-content: space-between;';
+                notice.innerHTML = `
+                    <div>
+                        🔍 Finding products similar to: <strong style="color: #1976d2;">${productData.platform.toUpperCase()} - ${productData.title.substring(0, 50)}${productData.title.length > 50 ? '...' : ''}</strong>
                     </div>
-                `);
+                    <button onclick="clearAutoSearch()" style="background-color: #1976d2; color: white; border: none; padding: 4px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">Clear</button>
+                `;
+                header.parentNode.insertBefore(notice, header.nextSibling);
             }
 
             // Clear the data from sessionStorage
@@ -1683,23 +1727,41 @@ function updateProgressBar() {
 
             // Optionally auto-start the search
             setTimeout(() => {
-                if (confirm('Start searching for similar products?')) {
-                    // Trigger the search button click
-                    const searchButton = document.getElementById('search-button');
-                    if (searchButton) {
-                        searchButton.click();
-                    }
+                const autoNotice = document.querySelector('.auto-search-notice');
+                if (autoNotice) {
+                    autoNotice.innerHTML += '<span style="margin-left: 10px; color: #1976d2;">Ready to search!</span>';
                 }
             }, 500);
         }
     }
+
+    // Load categories as usual
+    loadCategories();
 });
 
 // Function to clear auto-populated data
-function clearAutoSearch() {
-    document.getElementById('product-title').value = '';
-    document.getElementById('image-url').value = '';
-    document.getElementById('image-preview').style.display = 'none';
+window.clearAutoSearch = function() {
+    titleInput.value = '';
+    imageUrlInput.value = '';
+    imageInput.value = '';
+    selectedFile = null;
+    fileInputLabel.classList.remove('has-file');
+    fileInputLabel.querySelector('.file-name').textContent = 'Click to upload image or drag & drop';
+    imagePreview.style.display = 'none';
+    categorySelect.value = '';
+    searchTermsInput.value = '';
+    scrapeFreshData.checked = false;
+    scrapeSection.style.display = 'none';
+    categoryGroup.style.display = 'block';
+
+    // Switch back to file input mode
+    inputType = 'file';
+    fileInputBtn.classList.add('active');
+    urlInputBtn.classList.remove('active');
+    fileInputWrapper.style.display = 'block';
+    urlInputWrapper.style.display = 'none';
+
+    // Remove the notice
     document.querySelector('.auto-search-notice')?.remove();
 }
 const autoSearchStyles = ''

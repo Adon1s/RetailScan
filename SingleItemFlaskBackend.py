@@ -436,11 +436,27 @@ def match_single_item():
         elif 'imageUrl' in request.form:
             image_url = request.form.get('imageUrl', '').strip()
             if image_url:
-                image_path = image_url
-                logger.info(f"Using image URL: {image_url}")
-
-        if not image_path:
-            return jsonify({'error': 'Product image is required (file upload or URL)'}), 400
+                # Check if it's a local API URL
+                if '/api/product-image/' in image_url:
+                    # Extract the path components
+                    match = re.search(r'/api/product-image/([^/]+)/([^/]+)/([^/]+)$', image_url)
+                    if match:
+                        platform, category, filename = match.groups()
+                        # Construct the local file path
+                        local_path = f"{platform}_{category}_imgs/{filename}"
+                        if os.path.exists(local_path):
+                            image_path = local_path
+                            logger.info(f"Converted API URL to local path: {local_path}")
+                        else:
+                            logger.error(f"Local file not found: {local_path}")
+                            return jsonify({'error': f'Image file not found: {local_path}'}), 404
+                    else:
+                        logger.error(f"Could not parse API URL: {image_url}")
+                        return jsonify({'error': 'Invalid image URL format'}), 400
+                else:
+                    # Regular URL, use as-is
+                    image_path = image_url
+                    logger.info(f"Using image URL: {image_url}")
 
         # Initialize matcher
         matcher_instance = initialize_matcher(use_images=use_images)
@@ -587,6 +603,45 @@ def rerank_with_llm():
     except Exception as e:
         logger.error(f"Error in rerank endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/product-image/<platform>/<category>/<filename>')
+def serve_product_image(platform, category, filename):
+    """Serve product images from category-specific directories"""
+    try:
+        # Sanitize inputs
+        platform = secure_filename(platform)
+        category = secure_filename(category)
+        filename = secure_filename(filename)
+
+        # Construct the directory path
+        image_dir = f"{platform}_{category}_imgs"
+
+        # Check if directory exists
+        if not os.path.exists(image_dir):
+            logger.warning(f"Image directory not found: {image_dir}")
+            return jsonify({'error': 'Image directory not found'}), 404
+
+        # Construct full file path
+        file_path = os.path.join(image_dir, filename)
+
+        # Security check - ensure the path is within the expected directory
+        if not os.path.abspath(file_path).startswith(os.path.abspath(image_dir)):
+            return jsonify({'error': 'Invalid file path'}), 403
+
+        # Check if file exists
+        if not os.path.exists(file_path):
+            logger.warning(f"Image file not found: {file_path}")
+            return jsonify({'error': 'Image not found'}), 404
+
+        # Serve the file
+        return send_from_directory(image_dir, filename)
+
+    except Exception as e:
+        logger.error(f"Error serving product image: {str(e)}")
+        return jsonify({'error': 'Failed to serve image'}), 500
+
+
 
 
 @app.route('/api/single-item/match-by-id', methods=['POST'])
