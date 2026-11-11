@@ -72,7 +72,7 @@ def analyze_title_for_keywords(title):
     tl = title.lower()
     return {
         "high_value_keywords": [kw for kw in high_value_keywords if kw in tl],
-        "caution_keywords":   [kw for kw in caution_keywords if kw in tl],
+        "caution_keywords": [kw for kw in caution_keywords if kw in tl],
         "title_length": len(title),
         "word_count": len(title.split())
     }
@@ -106,28 +106,28 @@ def load_and_analyze_products():
             title_info = analyze_title_for_keywords(title)
 
             products.append({
-                ID_FIELD:         prod_id,
-                "title":          title,
-                "price":          price,
-                "product_url":    row["product_url"],
-                "has_image":      img_exists,
-                "image_path":     f"{IMAGES_DIR.name}/{prod_id}.jpg" if img_exists else None,
+                ID_FIELD: prod_id,
+                "title": title,
+                "price": price,
+                "product_url": row["product_url"],
+                "has_image": img_exists,
+                "image_path": f"{IMAGES_DIR.name}/{prod_id}.jpg" if img_exists else None,
 
                 # derived fields
-                "price_category":     categorize_price_range(price),
+                "price_category": categorize_price_range(price),
                 "potential_markup_2x": price * 2 if price else "unknown",
                 "potential_markup_3x": price * 3 if price else "unknown",
                 **title_info,
 
                 "has_gift_potential": "gift" in title.lower() or "christmas" in title.lower(),
-                "is_educational":     any(k in title.lower() for k in ["educational", "learning", "development"]),
-                "is_bundle_or_set":   any(k in title.lower() for k in ["set", "bundle", "pack", "pcs", "pieces"]),
+                "is_educational": any(k in title.lower() for k in ["educational", "learning", "development"]),
+                "is_bundle_or_set": any(k in title.lower() for k in ["set", "bundle", "pack", "pcs", "pieces"]),
 
                 "resale_score_hints": {
                     "has_multiple_value_keywords": len(title_info["high_value_keywords"]) >= 2,
                     "good_price_range": 10 < price < 50,
                     "has_caution_flags": bool(title_info["caution_keywords"]),
-                    "image_available":   img_exists,
+                    "image_available": img_exists,
                 },
             })
 
@@ -135,9 +135,9 @@ def load_and_analyze_products():
 
 
 def create_llm_analysis_file(products):
-    total   = len(products)
-    img_cnt = sum(p["has_image"]          for p in products)
-    priced  = sum(p["price"] > 0          for p in products)
+    total = len(products)
+    img_cnt = sum(p["has_image"] for p in products)
+    priced = sum(p["price"] > 0 for p in products)
 
     price_distribution = {}
     for p in products:
@@ -155,7 +155,7 @@ def create_llm_analysis_file(products):
             "price_distribution": price_distribution,
             "analysis_purpose": "Purchasability assessment for resale"
         },
-        "analysis_guidelines": {        # unchanged text
+        "analysis_guidelines": {
             "good_resale_indicators": [
                 "Price between $10-50 (good margin potential)",
                 "Educational or developmental focus",
